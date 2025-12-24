@@ -1,0 +1,76 @@
+.constraints {
+  max-width: 1000px;
+}
+
+.constraints-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 1.5rem;
+}
+
+.constraint-section {
+  padding: 1.5rem;
+}
+
+.section-title {
+  font-size: 1rem;
+  font-weight: 600;
+  margin-bottom: 1.25rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.constraint-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.form-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.form-row label {
+  font-size: 0.875rem;
+  color: var(--text-primary);
+}
+
+.input-group {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.input-group input[type="number"] {
+  width: 70px;
+  text-align: center;
+}
+
+.input-suffix {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+}
+
+.checkbox-row {
+  justify-content: flex-start;
+}
+
+.checkbox-row label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+}
+
+.checkbox-row input[type="checkbox"] {
+  width: 1rem;
+  height: 1rem;
+}
+
+.save-section {
+  margin-top: 1.5rem;
+  display: flex;
+  justify-content: flex-end;
+}

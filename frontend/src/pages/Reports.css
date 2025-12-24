@@ -1,0 +1,111 @@
+.reports {
+  max-width: 1200px;
+}
+
+.header-actions {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.month-picker {
+  padding: 0.5rem 0.75rem;
+}
+
+.summary-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.summary-card {
+  text-align: center;
+  padding: 1.25rem;
+}
+
+.summary-label {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  margin-bottom: 0.5rem;
+}
+
+.summary-value {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: var(--primary-color);
+}
+
+.card-title {
+  font-size: 1rem;
+  font-weight: 600;
+  margin-bottom: 1rem;
+}
+
+.hours-table {
+  width: 100%;
+  margin-bottom: 1rem;
+}
+
+.staff-name {
+  font-weight: 500;
+}
+
+.overtime-warning {
+  color: var(--warning-color);
+  font-weight: 500;
+}
+
+.shift-distribution {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.distribution-item {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.distribution-bar {
+  height: 24px;
+  border-radius: 4px;
+  min-width: 5px;
+}
+
+.distribution-bar.early { background-color: #fbbf24; }
+.distribution-bar.day { background-color: #22c55e; }
+.distribution-bar.late { background-color: #3b82f6; }
+.distribution-bar.night { background-color: #8b5cf6; }
+.distribution-bar.off { background-color: #94a3b8; }
+
+.distribution-label {
+  font-size: 0.875rem;
+  min-width: 100px;
+}
+
+.detail-table {
+  width: 100%;
+}
+
+.detail-table th,
+.detail-table td {
+  text-align: center;
+  padding: 0.5rem;
+}
+
+.detail-table th:first-child,
+.detail-table td:first-child {
+  text-align: left;
+}
+
+.card + .card {
+  margin-top: 1.5rem;
+}
+
+.error {
+  padding: 2rem;
+  text-align: center;
+  color: #dc2626;
+}
