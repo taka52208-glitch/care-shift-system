@@ -14,9 +14,6 @@ import reportRoutes from './routes/report.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-// Initialize database
-initDatabase();
-
 const app = express();
 const PORT = process.env.PORT || 3001;
 
@@ -47,6 +44,12 @@ if (process.env.NODE_ENV === 'production') {
   });
 }
 
-app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
-});
+// Initialize database and start server
+async function start() {
+  await initDatabase();
+  app.listen(PORT, () => {
+    console.log(`Server running on http://localhost:${PORT}`);
+  });
+}
+
+start().catch(console.error);

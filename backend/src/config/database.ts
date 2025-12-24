@@ -1,19 +1,58 @@
-import Database from 'better-sqlite3';
-import path from 'path';
-import { fileURLToPath } from 'url';
+import initSqlJs, { Database as SqlJsDatabase } from 'sql.js';
 import bcrypt from 'bcryptjs';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const dbPath = path.join(__dirname, '../../data/shift.db');
+let db: SqlJsDatabase;
 
-export const db = new Database(dbPath);
+// Wrapper to match better-sqlite3 API
+export const getDb = () => db;
 
-// Enable foreign keys
-db.pragma('foreign_keys = ON');
+export const dbWrapper = {
+  prepare: (sql: string) => ({
+    run: (...params: unknown[]) => {
+      db.run(sql, params);
+      return { changes: db.getRowsModified() };
+    },
+    get: (...params: unknown[]) => {
+      const stmt = db.prepare(sql);
+      stmt.bind(params);
+      if (stmt.step()) {
+        const columns = stmt.getColumnNames();
+        const values = stmt.get();
+        const row: Record<string, unknown> = {};
+        columns.forEach((col, i) => { row[col] = values[i]; });
+        stmt.free();
+        return row;
+      }
+      stmt.free();
+      return undefined;
+    },
+    all: (...params: unknown[]) => {
+      const results: Record<string, unknown>[] = [];
+      const stmt = db.prepare(sql);
+      stmt.bind(params);
+      while (stmt.step()) {
+        const columns = stmt.getColumnNames();
+        const values = stmt.get();
+        const row: Record<string, unknown> = {};
+        columns.forEach((col, i) => { row[col] = values[i]; });
+        results.push(row);
+      }
+      stmt.free();
+      return results;
+    }
+  }),
+  exec: (sql: string) => {
+    db.run(sql);
+  }
+};
 
-// Initialize database schema
-export function initDatabase() {
-  db.exec(`
+export { dbWrapper as db };
+
+export async function initDatabase() {
+  const SQL = await initSqlJs();
+  db = new SQL.Database();
+
+  db.run(`
     -- Staff table
     CREATE TABLE IF NOT EXISTS staff (
       id TEXT PRIMARY KEY,
@@ -79,59 +118,45 @@ export function initDatabase() {
     );
   `);
 
-  // Insert default patterns if not exists
-  const patternCount = db.prepare('SELECT COUNT(*) as count FROM patterns').get() as { count: number };
-  if (patternCount.count === 0) {
-    const insertPattern = db.prepare(`
-      INSERT INTO patterns (id, name, code, start_time, end_time, break_time, color)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `);
-    insertPattern.run('1', '早番', 'E', '07:00', '16:00', 60, '#fbbf24');
-    insertPattern.run('2', '日勤', 'D', '09:00', '18:00', 60, '#22c55e');
-    insertPattern.run('3', '遅番', 'L', '12:00', '21:00', 60, '#3b82f6');
-    insertPattern.run('4', '夜勤', 'N', '21:00', '07:00', 120, '#8b5cf6');
-    insertPattern.run('5', '公休', 'O', '-', '-', 0, '#94a3b8');
+  // Insert default patterns
+  const patternCount = dbWrapper.prepare('SELECT COUNT(*) as count FROM patterns').get() as { count: number } | undefined;
+  if (!patternCount || patternCount.count === 0) {
+    db.run("INSERT INTO patterns (id, name, code, start_time, end_time, break_time, color) VALUES ('1', '早番', 'E', '07:00', '16:00', 60, '#fbbf24')");
+    db.run("INSERT INTO patterns (id, name, code, start_time, end_time, break_time, color) VALUES ('2', '日勤', 'D', '09:00', '18:00', 60, '#22c55e')");
+    db.run("INSERT INTO patterns (id, name, code, start_time, end_time, break_time, color) VALUES ('3', '遅番', 'L', '12:00', '21:00', 60, '#3b82f6')");
+    db.run("INSERT INTO patterns (id, name, code, start_time, end_time, break_time, color) VALUES ('4', '夜勤', 'N', '21:00', '07:00', 120, '#8b5cf6')");
+    db.run("INSERT INTO patterns (id, name, code, start_time, end_time, break_time, color) VALUES ('5', '公休', 'O', '-', '-', 0, '#94a3b8')");
   }
 
-  // Insert default constraints if not exists
-  const constraintCount = db.prepare('SELECT COUNT(*) as count FROM constraints').get() as { count: number };
-  if (constraintCount.count === 0) {
-    const insertConstraint = db.prepare(`
-      INSERT INTO constraints (id, category, key, value) VALUES (?, ?, ?, ?)
-    `);
-    insertConstraint.run('1', 'staffing', 'minDayStaff', '3');
-    insertConstraint.run('2', 'staffing', 'minNightStaff', '2');
-    insertConstraint.run('3', 'staffing', 'minQualifiedDay', '1');
-    insertConstraint.run('4', 'workLimit', 'maxConsecutiveDays', '5');
-    insertConstraint.run('5', 'workLimit', 'maxNightShifts', '8');
-    insertConstraint.run('6', 'workLimit', 'restAfterNight', '1');
-    insertConstraint.run('7', 'holiday', 'weeklyHolidays', '2');
-    insertConstraint.run('8', 'holiday', 'minMonthlyHolidays', '8');
+  // Insert default constraints
+  const constraintCount = dbWrapper.prepare('SELECT COUNT(*) as count FROM constraints').get() as { count: number } | undefined;
+  if (!constraintCount || constraintCount.count === 0) {
+    db.run("INSERT INTO constraints (id, category, key, value) VALUES ('1', 'staffing', 'minDayStaff', '3')");
+    db.run("INSERT INTO constraints (id, category, key, value) VALUES ('2', 'staffing', 'minNightStaff', '2')");
+    db.run("INSERT INTO constraints (id, category, key, value) VALUES ('3', 'staffing', 'minQualifiedDay', '1')");
+    db.run("INSERT INTO constraints (id, category, key, value) VALUES ('4', 'workLimit', 'maxConsecutiveDays', '5')");
+    db.run("INSERT INTO constraints (id, category, key, value) VALUES ('5', 'workLimit', 'maxNightShifts', '8')");
+    db.run("INSERT INTO constraints (id, category, key, value) VALUES ('6', 'workLimit', 'restAfterNight', '1')");
+    db.run("INSERT INTO constraints (id, category, key, value) VALUES ('7', 'holiday', 'weeklyHolidays', '2')");
+    db.run("INSERT INTO constraints (id, category, key, value) VALUES ('8', 'holiday', 'minMonthlyHolidays', '8')");
   }
 
-  // Insert sample staff if not exists
-  const staffCount = db.prepare('SELECT COUNT(*) as count FROM staff').get() as { count: number };
-  if (staffCount.count === 0) {
-    const insertStaff = db.prepare(`
-      INSERT INTO staff (id, name, qualification, employment_type, phone, created_at)
-      VALUES (?, ?, ?, ?, ?, datetime('now'))
-    `);
-    insertStaff.run('1', '山田太郎', '介護福祉士', '正社員', '090-1234-5678');
-    insertStaff.run('2', '佐藤花子', 'ヘルパー2級', 'パート', '090-2345-6789');
-    insertStaff.run('3', '鈴木一郎', '介護福祉士', '正社員', '090-3456-7890');
-    insertStaff.run('4', '田中美咲', 'ヘルパー2級', 'パート', '090-4567-8901');
-    insertStaff.run('5', '高橋健二', '介護福祉士', '正社員', '090-5678-9012');
+  // Insert sample staff
+  const staffCount = dbWrapper.prepare('SELECT COUNT(*) as count FROM staff').get() as { count: number } | undefined;
+  if (!staffCount || staffCount.count === 0) {
+    db.run("INSERT INTO staff (id, name, qualification, employment_type, phone, created_at) VALUES ('1', '山田太郎', '介護福祉士', '正社員', '090-1234-5678', datetime('now'))");
+    db.run("INSERT INTO staff (id, name, qualification, employment_type, phone, created_at) VALUES ('2', '佐藤花子', 'ヘルパー2級', 'パート', '090-2345-6789', datetime('now'))");
+    db.run("INSERT INTO staff (id, name, qualification, employment_type, phone, created_at) VALUES ('3', '鈴木一郎', '介護福祉士', '正社員', '090-3456-7890', datetime('now'))");
+    db.run("INSERT INTO staff (id, name, qualification, employment_type, phone, created_at) VALUES ('4', '田中美咲', 'ヘルパー2級', 'パート', '090-4567-8901', datetime('now'))");
+    db.run("INSERT INTO staff (id, name, qualification, employment_type, phone, created_at) VALUES ('5', '高橋健二', '介護福祉士', '正社員', '090-5678-9012', datetime('now'))");
   }
 
-  // Insert default admin user if not exists
-  const userCount = db.prepare('SELECT COUNT(*) as count FROM users').get() as { count: number };
-  if (userCount.count === 0) {
+  // Insert default admin user
+  const userCount = dbWrapper.prepare('SELECT COUNT(*) as count FROM users').get() as { count: number } | undefined;
+  if (!userCount || userCount.count === 0) {
     const hashedPassword = bcrypt.hashSync('admin123', 10);
-    db.prepare(`
-      INSERT INTO users (id, email, password, name, role)
-      VALUES (?, ?, ?, ?, ?)
-    `).run('1', 'admin@example.com', hashedPassword, '管理者', 'admin');
+    db.run(`INSERT INTO users (id, email, password, name, role, created_at) VALUES ('1', 'admin@example.com', '${hashedPassword}', '管理者', 'admin', datetime('now'))`);
   }
 
-  console.log('Database initialized');
+  console.log('Database initialized (in-memory with sql.js)');
 }
