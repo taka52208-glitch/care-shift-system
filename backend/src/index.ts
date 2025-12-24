@@ -44,12 +44,9 @@ if (process.env.NODE_ENV === 'production') {
   });
 }
 
-// Initialize database and start server
-async function start() {
-  await initDatabase();
-  app.listen(PORT, () => {
-    console.log(`Server running on http://localhost:${PORT}`);
-  });
-}
+// Initialize database
+initDatabase();
 
-start().catch(console.error);
+app.listen(PORT, () => {
+  console.log(`Server running on http://localhost:${PORT}`);
+});

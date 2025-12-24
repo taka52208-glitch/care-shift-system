@@ -1,162 +1,210 @@
-import initSqlJs, { Database as SqlJsDatabase } from 'sql.js';
 import bcrypt from 'bcryptjs';
 
-let db: SqlJsDatabase;
+// In-memory data storage
+interface Tables {
+  staff: Record<string, unknown>[];
+  patterns: Record<string, unknown>[];
+  shifts: Record<string, unknown>[];
+  requests: Record<string, unknown>[];
+  constraints: Record<string, unknown>[];
+  users: Record<string, unknown>[];
+}
 
-// Wrapper to match better-sqlite3 API
-export const getDb = () => db;
+const tables: Tables = {
+  staff: [],
+  patterns: [],
+  shifts: [],
+  requests: [],
+  constraints: [],
+  users: []
+};
 
-export const dbWrapper = {
-  prepare: (sql: string) => ({
-    run: (...params: unknown[]) => {
-      db.run(sql, params);
-      return { changes: db.getRowsModified() };
-    },
-    get: (...params: unknown[]) => {
-      const stmt = db.prepare(sql);
-      stmt.bind(params);
-      if (stmt.step()) {
-        const columns = stmt.getColumnNames();
-        const values = stmt.get();
-        const row: Record<string, unknown> = {};
-        columns.forEach((col, i) => { row[col] = values[i]; });
-        stmt.free();
-        return row;
+// Simple query helper that mimics better-sqlite3 API
+export const db = {
+  prepare: (sql: string) => {
+    return {
+      run: (...params: unknown[]) => {
+        const result = executeQuery(sql, params);
+        return { changes: result.changes };
+      },
+      get: (...params: unknown[]) => {
+        const result = executeQuery(sql, params);
+        return result.rows[0];
+      },
+      all: (...params: unknown[]) => {
+        const result = executeQuery(sql, params);
+        return result.rows;
       }
-      stmt.free();
-      return undefined;
-    },
-    all: (...params: unknown[]) => {
-      const results: Record<string, unknown>[] = [];
-      const stmt = db.prepare(sql);
-      stmt.bind(params);
-      while (stmt.step()) {
-        const columns = stmt.getColumnNames();
-        const values = stmt.get();
-        const row: Record<string, unknown> = {};
-        columns.forEach((col, i) => { row[col] = values[i]; });
-        results.push(row);
-      }
-      stmt.free();
-      return results;
-    }
-  }),
-  exec: (sql: string) => {
-    db.run(sql);
+    };
+  },
+  exec: (_sql: string) => {
+    // For CREATE TABLE statements, just ignore (tables already exist)
   }
 };
 
-export { dbWrapper as db };
+function executeQuery(sql: string, params: unknown[]): { rows: Record<string, unknown>[]; changes: number } {
+  const sqlLower = sql.toLowerCase().trim();
 
-export async function initDatabase() {
-  const SQL = await initSqlJs();
-  db = new SQL.Database();
-
-  db.run(`
-    -- Staff table
-    CREATE TABLE IF NOT EXISTS staff (
-      id TEXT PRIMARY KEY,
-      name TEXT NOT NULL,
-      qualification TEXT NOT NULL,
-      employment_type TEXT NOT NULL,
-      phone TEXT NOT NULL,
-      email TEXT,
-      created_at TEXT NOT NULL DEFAULT (datetime('now'))
-    );
-
-    -- Shift patterns table
-    CREATE TABLE IF NOT EXISTS patterns (
-      id TEXT PRIMARY KEY,
-      name TEXT NOT NULL,
-      code TEXT NOT NULL UNIQUE,
-      start_time TEXT NOT NULL,
-      end_time TEXT NOT NULL,
-      break_time INTEGER NOT NULL DEFAULT 60,
-      color TEXT NOT NULL DEFAULT '#3b82f6'
-    );
-
-    -- Shifts table
-    CREATE TABLE IF NOT EXISTS shifts (
-      id TEXT PRIMARY KEY,
-      staff_id TEXT NOT NULL,
-      date TEXT NOT NULL,
-      pattern_id TEXT NOT NULL,
-      FOREIGN KEY (staff_id) REFERENCES staff(id) ON DELETE CASCADE,
-      FOREIGN KEY (pattern_id) REFERENCES patterns(id),
-      UNIQUE(staff_id, date)
-    );
-
-    -- Shift requests table
-    CREATE TABLE IF NOT EXISTS requests (
-      id TEXT PRIMARY KEY,
-      staff_id TEXT NOT NULL,
-      staff_name TEXT NOT NULL,
-      date TEXT NOT NULL,
-      request_type TEXT NOT NULL,
-      reason TEXT,
-      status TEXT NOT NULL DEFAULT 'pending',
-      created_at TEXT NOT NULL DEFAULT (datetime('now')),
-      FOREIGN KEY (staff_id) REFERENCES staff(id) ON DELETE CASCADE
-    );
-
-    -- Constraints table
-    CREATE TABLE IF NOT EXISTS constraints (
-      id TEXT PRIMARY KEY,
-      category TEXT NOT NULL,
-      key TEXT NOT NULL UNIQUE,
-      value TEXT NOT NULL
-    );
-
-    -- Users table
-    CREATE TABLE IF NOT EXISTS users (
-      id TEXT PRIMARY KEY,
-      email TEXT NOT NULL UNIQUE,
-      password TEXT NOT NULL,
-      name TEXT NOT NULL,
-      role TEXT NOT NULL DEFAULT 'user',
-      created_at TEXT NOT NULL DEFAULT (datetime('now'))
-    );
-  `);
-
-  // Insert default patterns
-  const patternCount = dbWrapper.prepare('SELECT COUNT(*) as count FROM patterns').get() as { count: number } | undefined;
-  if (!patternCount || patternCount.count === 0) {
-    db.run("INSERT INTO patterns (id, name, code, start_time, end_time, break_time, color) VALUES ('1', '早番', 'E', '07:00', '16:00', 60, '#fbbf24')");
-    db.run("INSERT INTO patterns (id, name, code, start_time, end_time, break_time, color) VALUES ('2', '日勤', 'D', '09:00', '18:00', 60, '#22c55e')");
-    db.run("INSERT INTO patterns (id, name, code, start_time, end_time, break_time, color) VALUES ('3', '遅番', 'L', '12:00', '21:00', 60, '#3b82f6')");
-    db.run("INSERT INTO patterns (id, name, code, start_time, end_time, break_time, color) VALUES ('4', '夜勤', 'N', '21:00', '07:00', 120, '#8b5cf6')");
-    db.run("INSERT INTO patterns (id, name, code, start_time, end_time, break_time, color) VALUES ('5', '公休', 'O', '-', '-', 0, '#94a3b8')");
+  if (sqlLower.startsWith('select')) {
+    return handleSelect(sql, params);
+  }
+  if (sqlLower.startsWith('insert')) {
+    return handleInsert(sql, params);
+  }
+  if (sqlLower.startsWith('update')) {
+    return handleUpdate(sql, params);
+  }
+  if (sqlLower.startsWith('delete')) {
+    return handleDelete(sql, params);
   }
 
-  // Insert default constraints
-  const constraintCount = dbWrapper.prepare('SELECT COUNT(*) as count FROM constraints').get() as { count: number } | undefined;
-  if (!constraintCount || constraintCount.count === 0) {
-    db.run("INSERT INTO constraints (id, category, key, value) VALUES ('1', 'staffing', 'minDayStaff', '3')");
-    db.run("INSERT INTO constraints (id, category, key, value) VALUES ('2', 'staffing', 'minNightStaff', '2')");
-    db.run("INSERT INTO constraints (id, category, key, value) VALUES ('3', 'staffing', 'minQualifiedDay', '1')");
-    db.run("INSERT INTO constraints (id, category, key, value) VALUES ('4', 'workLimit', 'maxConsecutiveDays', '5')");
-    db.run("INSERT INTO constraints (id, category, key, value) VALUES ('5', 'workLimit', 'maxNightShifts', '8')");
-    db.run("INSERT INTO constraints (id, category, key, value) VALUES ('6', 'workLimit', 'restAfterNight', '1')");
-    db.run("INSERT INTO constraints (id, category, key, value) VALUES ('7', 'holiday', 'weeklyHolidays', '2')");
-    db.run("INSERT INTO constraints (id, category, key, value) VALUES ('8', 'holiday', 'minMonthlyHolidays', '8')");
+  return { rows: [], changes: 0 };
+}
+
+function getTableName(sql: string): keyof Tables | null {
+  const tablesList: (keyof Tables)[] = ['staff', 'patterns', 'shifts', 'requests', 'constraints', 'users'];
+  for (const table of tablesList) {
+    if (sql.toLowerCase().includes(table)) {
+      return table;
+    }
+  }
+  return null;
+}
+
+function handleSelect(sql: string, params: unknown[]): { rows: Record<string, unknown>[]; changes: number } {
+  const tableName = getTableName(sql);
+  if (!tableName) return { rows: [], changes: 0 };
+
+  let rows = [...tables[tableName]];
+
+  if (sql.toLowerCase().includes('where')) {
+    const whereMatch = sql.match(/where\s+(\w+)\s*=\s*\?/i);
+    if (whereMatch && params.length > 0) {
+      const field = whereMatch[1];
+      rows = rows.filter(row => row[field] === params[0]);
+    }
   }
 
-  // Insert sample staff
-  const staffCount = dbWrapper.prepare('SELECT COUNT(*) as count FROM staff').get() as { count: number } | undefined;
-  if (!staffCount || staffCount.count === 0) {
-    db.run("INSERT INTO staff (id, name, qualification, employment_type, phone, created_at) VALUES ('1', '山田太郎', '介護福祉士', '正社員', '090-1234-5678', datetime('now'))");
-    db.run("INSERT INTO staff (id, name, qualification, employment_type, phone, created_at) VALUES ('2', '佐藤花子', 'ヘルパー2級', 'パート', '090-2345-6789', datetime('now'))");
-    db.run("INSERT INTO staff (id, name, qualification, employment_type, phone, created_at) VALUES ('3', '鈴木一郎', '介護福祉士', '正社員', '090-3456-7890', datetime('now'))");
-    db.run("INSERT INTO staff (id, name, qualification, employment_type, phone, created_at) VALUES ('4', '田中美咲', 'ヘルパー2級', 'パート', '090-4567-8901', datetime('now'))");
-    db.run("INSERT INTO staff (id, name, qualification, employment_type, phone, created_at) VALUES ('5', '高橋健二', '介護福祉士', '正社員', '090-5678-9012', datetime('now'))");
+  if (sql.toLowerCase().includes('order by')) {
+    const orderMatch = sql.match(/order by\s+(\w+)/i);
+    if (orderMatch) {
+      const field = orderMatch[1];
+      rows.sort((a, b) => String(a[field] || '').localeCompare(String(b[field] || '')));
+    }
   }
 
-  // Insert default admin user
-  const userCount = dbWrapper.prepare('SELECT COUNT(*) as count FROM users').get() as { count: number } | undefined;
-  if (!userCount || userCount.count === 0) {
+  return { rows, changes: 0 };
+}
+
+function handleInsert(sql: string, params: unknown[]): { rows: Record<string, unknown>[]; changes: number } {
+  const tableName = getTableName(sql);
+  if (!tableName) return { rows: [], changes: 0 };
+
+  const colMatch = sql.match(/\(([^)]+)\)\s*values/i);
+  if (!colMatch) return { rows: [], changes: 0 };
+
+  const columns = colMatch[1].split(',').map(c => c.trim());
+  const row: Record<string, unknown> = {};
+
+  columns.forEach((col, i) => {
+    row[col] = params[i] !== undefined ? params[i] : null;
+  });
+
+  tables[tableName].push(row);
+  return { rows: [], changes: 1 };
+}
+
+function handleUpdate(sql: string, params: unknown[]): { rows: Record<string, unknown>[]; changes: number } {
+  const tableName = getTableName(sql);
+  if (!tableName) return { rows: [], changes: 0 };
+
+  const setMatch = sql.match(/set\s+(.+?)\s+where/i);
+  if (!setMatch) return { rows: [], changes: 0 };
+
+  const setClauses = setMatch[1].split(',').map(c => c.trim().split('=')[0].trim());
+
+  const whereMatch = sql.match(/where\s+(\w+)\s*=\s*\?/i);
+  if (!whereMatch) return { rows: [], changes: 0 };
+
+  const whereField = whereMatch[1];
+  const whereValue = params[params.length - 1];
+
+  let changes = 0;
+  tables[tableName].forEach(row => {
+    if (row[whereField] === whereValue) {
+      setClauses.forEach((col, i) => {
+        row[col] = params[i];
+      });
+      changes++;
+    }
+  });
+
+  return { rows: [], changes };
+}
+
+function handleDelete(sql: string, params: unknown[]): { rows: Record<string, unknown>[]; changes: number } {
+  const tableName = getTableName(sql);
+  if (!tableName) return { rows: [], changes: 0 };
+
+  const whereMatch = sql.match(/where\s+(\w+)\s*=\s*\?/i);
+  if (!whereMatch) return { rows: [], changes: 0 };
+
+  const field = whereMatch[1];
+  const value = params[0];
+
+  const initialLength = tables[tableName].length;
+  tables[tableName] = tables[tableName].filter(row => row[field] !== value);
+
+  return { rows: [], changes: initialLength - tables[tableName].length };
+}
+
+export function initDatabase() {
+  if (tables.patterns.length === 0) {
+    tables.patterns.push(
+      { id: '1', name: '早番', code: 'E', start_time: '07:00', end_time: '16:00', break_time: 60, color: '#fbbf24' },
+      { id: '2', name: '日勤', code: 'D', start_time: '09:00', end_time: '18:00', break_time: 60, color: '#22c55e' },
+      { id: '3', name: '遅番', code: 'L', start_time: '12:00', end_time: '21:00', break_time: 60, color: '#3b82f6' },
+      { id: '4', name: '夜勤', code: 'N', start_time: '21:00', end_time: '07:00', break_time: 120, color: '#8b5cf6' },
+      { id: '5', name: '公休', code: 'O', start_time: '-', end_time: '-', break_time: 0, color: '#94a3b8' }
+    );
+  }
+
+  if (tables.constraints.length === 0) {
+    tables.constraints.push(
+      { id: '1', category: 'staffing', key: 'minDayStaff', value: '3' },
+      { id: '2', category: 'staffing', key: 'minNightStaff', value: '2' },
+      { id: '3', category: 'staffing', key: 'minQualifiedDay', value: '1' },
+      { id: '4', category: 'workLimit', key: 'maxConsecutiveDays', value: '5' },
+      { id: '5', category: 'workLimit', key: 'maxNightShifts', value: '8' },
+      { id: '6', category: 'workLimit', key: 'restAfterNight', value: '1' },
+      { id: '7', category: 'holiday', key: 'weeklyHolidays', value: '2' },
+      { id: '8', category: 'holiday', key: 'minMonthlyHolidays', value: '8' }
+    );
+  }
+
+  if (tables.staff.length === 0) {
+    const now = new Date().toISOString();
+    tables.staff.push(
+      { id: '1', name: '山田太郎', qualification: '介護福祉士', employment_type: '正社員', phone: '090-1234-5678', email: null, created_at: now },
+      { id: '2', name: '佐藤花子', qualification: 'ヘルパー2級', employment_type: 'パート', phone: '090-2345-6789', email: null, created_at: now },
+      { id: '3', name: '鈴木一郎', qualification: '介護福祉士', employment_type: '正社員', phone: '090-3456-7890', email: null, created_at: now },
+      { id: '4', name: '田中美咲', qualification: 'ヘルパー2級', employment_type: 'パート', phone: '090-4567-8901', email: null, created_at: now },
+      { id: '5', name: '高橋健二', qualification: '介護福祉士', employment_type: '正社員', phone: '090-5678-9012', email: null, created_at: now }
+    );
+  }
+
+  if (tables.users.length === 0) {
     const hashedPassword = bcrypt.hashSync('admin123', 10);
-    db.run(`INSERT INTO users (id, email, password, name, role, created_at) VALUES ('1', 'admin@example.com', '${hashedPassword}', '管理者', 'admin', datetime('now'))`);
+    const now = new Date().toISOString();
+    tables.users.push({
+      id: '1',
+      email: 'admin@example.com',
+      password: hashedPassword,
+      name: '管理者',
+      role: 'admin',
+      created_at: now
+    });
   }
 
-  console.log('Database initialized (in-memory with sql.js)');
+  console.log('Database initialized (in-memory store)');
 }
