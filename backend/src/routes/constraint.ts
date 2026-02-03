@@ -1,60 +1,113 @@
 import { Router } from 'express';
-import { db } from '../config/database.js';
+import { prisma } from '../lib/prisma.js';
+import { authMiddleware } from '../middleware/auth.js';
+import { toConstraintResponse } from '../types/index.js';
 
 const router = Router();
 
-interface ConstraintRow {
-  id: string;
-  category: string;
-  key: string;
-  value: string;
-}
-
-const toConstraint = (row: ConstraintRow) => ({
-  id: row.id,
-  category: row.category,
-  key: row.key,
-  value: isNaN(Number(row.value)) ? row.value === 'true' : Number(row.value)
-});
-
 // GET all constraints
-router.get('/', (req, res) => {
-  const rows = db.prepare('SELECT * FROM constraints ORDER BY category, key').all() as ConstraintRow[];
-  res.json(rows.map(toConstraint));
+router.get('/', authMiddleware, async (req, res) => {
+  try {
+    const constraints = await prisma.constraint.findMany({
+      where: { tenantId: req.tenantId! },
+      orderBy: [{ category: 'asc' }, { key: 'asc' }],
+    });
+    res.json(constraints.map(toConstraintResponse));
+  } catch (error) {
+    console.error('Error fetching constraints:', error);
+    res.status(500).json({ error: '制約の取得に失敗しました' });
+  }
 });
 
 // GET constraints by category
-router.get('/category/:category', (req, res) => {
-  const rows = db.prepare('SELECT * FROM constraints WHERE category = ?').all(req.params.category) as ConstraintRow[];
-  res.json(rows.map(toConstraint));
+router.get('/category/:category', authMiddleware, async (req, res) => {
+  try {
+    const constraints = await prisma.constraint.findMany({
+      where: { tenantId: req.tenantId!, category: req.params.category },
+      orderBy: { key: 'asc' },
+    });
+    res.json(constraints.map(toConstraintResponse));
+  } catch (error) {
+    console.error('Error fetching constraints by category:', error);
+    res.status(500).json({ error: '制約の取得に失敗しました' });
+  }
 });
 
-// PUT update constraint
-router.put('/:id', (req, res) => {
-  const { value } = req.body;
-  const result = db.prepare('UPDATE constraints SET value = ? WHERE id = ?').run(String(value), req.params.id);
+// PUT update constraint by ID
+router.put('/:id', authMiddleware, async (req, res) => {
+  try {
+    const { value } = req.body;
+    const { id } = req.params;
 
-  if (result.changes === 0) return res.status(404).json({ error: 'Constraint not found' });
+    // Verify the constraint belongs to the tenant
+    const existing = await prisma.constraint.findFirst({
+      where: { id, tenantId: req.tenantId! },
+    });
 
-  const row = db.prepare('SELECT * FROM constraints WHERE id = ?').get(req.params.id) as ConstraintRow;
-  res.json(toConstraint(row));
-});
-
-// PUT bulk update constraints
-router.put('/', (req, res) => {
-  const { items } = req.body;
-  const update = db.prepare('UPDATE constraints SET value = ? WHERE id = ?');
-
-  const transaction = db.transaction((items: Array<{ id: string; value: number | boolean }>) => {
-    for (const item of items) {
-      update.run(String(item.value), item.id);
+    if (!existing) {
+      return res.status(404).json({ error: '制約が見つかりません' });
     }
-  });
 
-  transaction(items);
+    const updated = await prisma.constraint.update({
+      where: { id },
+      data: { value: String(value) },
+    });
 
-  const rows = db.prepare('SELECT * FROM constraints ORDER BY category, key').all() as ConstraintRow[];
-  res.json(rows.map(toConstraint));
+    res.json(toConstraintResponse(updated));
+  } catch (error) {
+    console.error('Error updating constraint:', error);
+    res.status(500).json({ error: '制約の更新に失敗しました' });
+  }
+});
+
+// PUT bulk update constraints (upsert)
+router.put('/', authMiddleware, async (req, res) => {
+  try {
+    const { items } = req.body as {
+      items: Array<{ id?: string; category: string; key: string; value: number | boolean | string }>;
+    };
+
+    if (!items || !Array.isArray(items)) {
+      return res.status(400).json({ error: 'items配列が必要です' });
+    }
+
+    const tenantId = req.tenantId!;
+
+    // Use transaction for bulk upsert
+    await prisma.$transaction(
+      items.map((item) =>
+        prisma.constraint.upsert({
+          where: {
+            tenantId_category_key: {
+              tenantId,
+              category: item.category,
+              key: item.key,
+            },
+          },
+          update: {
+            value: String(item.value),
+          },
+          create: {
+            tenantId,
+            category: item.category,
+            key: item.key,
+            value: String(item.value),
+          },
+        })
+      )
+    );
+
+    // Fetch all constraints for response
+    const constraints = await prisma.constraint.findMany({
+      where: { tenantId: req.tenantId! },
+      orderBy: [{ category: 'asc' }, { key: 'asc' }],
+    });
+
+    res.json(constraints.map(toConstraintResponse));
+  } catch (error) {
+    console.error('Error bulk updating constraints:', error);
+    res.status(500).json({ error: '制約の一括更新に失敗しました' });
+  }
 });
 
 export default router;

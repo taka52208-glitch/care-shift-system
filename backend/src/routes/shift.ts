@@ -1,146 +1,221 @@
 import { Router } from 'express';
-import { v4 as uuidv4 } from 'uuid';
-import { db } from '../config/database.js';
+import { prisma } from '../lib/prisma.js';
+import { authMiddleware } from '../middleware/auth.js';
+import { toShiftResponse } from '../types/index.js';
 import { generateShifts, clearShifts } from '../services/shiftGenerator.js';
 
 const router = Router();
 
-interface ShiftRow {
-  id: string;
-  staff_id: string;
-  date: string;
-  pattern_id: string;
-}
-
-const toShift = (row: ShiftRow) => ({
-  id: row.id,
-  staffId: row.staff_id,
-  date: row.date,
-  patternId: row.pattern_id
-});
-
 // GET all shifts
-router.get('/', (req, res) => {
-  const { month } = req.query;
-  let rows: ShiftRow[];
-  if (month && typeof month === 'string') {
-    rows = db.prepare('SELECT * FROM shifts WHERE date LIKE ? ORDER BY date').all(`${month}%`) as ShiftRow[];
-  } else {
-    rows = db.prepare('SELECT * FROM shifts ORDER BY date').all() as ShiftRow[];
+router.get('/', authMiddleware, async (req, res) => {
+  try {
+    const { month } = req.query;
+
+    const shifts = await prisma.shift.findMany({
+      where: month && typeof month === 'string'
+        ? { tenantId: req.tenantId!, date: { startsWith: month } }
+        : { tenantId: req.tenantId! },
+      orderBy: { date: 'asc' }
+    });
+
+    res.json(shifts.map(toShiftResponse));
+  } catch (error) {
+    console.error('Error fetching shifts:', error);
+    res.status(500).json({ error: 'シフト一覧の取得に失敗しました' });
   }
-  res.json(rows.map(toShift));
 });
 
 // GET shifts by staff ID
-router.get('/staff/:staffId', (req, res) => {
-  const rows = db.prepare('SELECT * FROM shifts WHERE staff_id = ? ORDER BY date').all(req.params.staffId) as ShiftRow[];
-  res.json(rows.map(toShift));
+router.get('/staff/:staffId', authMiddleware, async (req, res) => {
+  try {
+    const shifts = await prisma.shift.findMany({
+      where: { tenantId: req.tenantId!, staffId: req.params.staffId },
+      orderBy: { date: 'asc' }
+    });
+
+    res.json(shifts.map(toShiftResponse));
+  } catch (error) {
+    console.error('Error fetching staff shifts:', error);
+    res.status(500).json({ error: 'スタッフのシフト取得に失敗しました' });
+  }
 });
 
 // POST create shift
-router.post('/', (req, res) => {
-  const id = uuidv4();
-  const { staffId, date, patternId } = req.body;
-
+router.post('/', authMiddleware, async (req, res) => {
   try {
-    db.prepare(`
-      INSERT INTO shifts (id, staff_id, date, pattern_id) VALUES (?, ?, ?, ?)
-    `).run(id, staffId, date, patternId);
+    const { staffId, date, patternId } = req.body;
 
-    const row = db.prepare('SELECT * FROM shifts WHERE id = ?').get(id) as ShiftRow;
-    res.status(201).json(toShift(row));
-  } catch (e: unknown) {
-    if (e instanceof Error && e.message.includes('UNIQUE constraint')) {
+    // Check if shift already exists for this staff on this date
+    const existing = await prisma.shift.findFirst({
+      where: { tenantId: req.tenantId!, staffId, date }
+    });
+
+    if (existing) {
       // Update existing shift
-      db.prepare('UPDATE shifts SET pattern_id = ? WHERE staff_id = ? AND date = ?')
-        .run(patternId, staffId, date);
-      const row = db.prepare('SELECT * FROM shifts WHERE staff_id = ? AND date = ?').get(staffId, date) as ShiftRow;
-      res.json(toShift(row));
-    } else {
-      throw e;
+      const shift = await prisma.shift.update({
+        where: { id: existing.id },
+        data: { patternId }
+      });
+      return res.json(toShiftResponse(shift));
     }
+
+    // Create new shift
+    const shift = await prisma.shift.create({
+      data: {
+        staffId,
+        date,
+        patternId,
+        tenantId: req.tenantId!
+      }
+    });
+
+    res.status(201).json(toShiftResponse(shift));
+  } catch (error) {
+    console.error('Error creating shift:', error);
+    res.status(500).json({ error: 'シフトの作成に失敗しました' });
   }
 });
 
 // PUT update shift
-router.put('/:id', (req, res) => {
-  const { patternId } = req.body;
-  const result = db.prepare('UPDATE shifts SET pattern_id = ? WHERE id = ?').run(patternId, req.params.id);
+router.put('/:id', authMiddleware, async (req, res) => {
+  try {
+    const { patternId } = req.body;
 
-  if (result.changes === 0) return res.status(404).json({ error: 'Shift not found' });
+    // Check if shift exists
+    const existing = await prisma.shift.findFirst({
+      where: { tenantId: req.tenantId!, id: req.params.id }
+    });
 
-  const row = db.prepare('SELECT * FROM shifts WHERE id = ?').get(req.params.id) as ShiftRow;
-  res.json(toShift(row));
+    if (!existing) {
+      return res.status(404).json({ error: 'シフトが見つかりません' });
+    }
+
+    const shift = await prisma.shift.update({
+      where: { id: req.params.id },
+      data: { patternId }
+    });
+
+    res.json(toShiftResponse(shift));
+  } catch (error) {
+    console.error('Error updating shift:', error);
+    res.status(500).json({ error: 'シフトの更新に失敗しました' });
+  }
 });
 
 // DELETE shift
-router.delete('/:id', (req, res) => {
-  const result = db.prepare('DELETE FROM shifts WHERE id = ?').run(req.params.id);
-  if (result.changes === 0) return res.status(404).json({ error: 'Shift not found' });
-  res.status(204).send();
+router.delete('/:id', authMiddleware, async (req, res) => {
+  try {
+    // Check if shift exists
+    const existing = await prisma.shift.findFirst({
+      where: { tenantId: req.tenantId!, id: req.params.id }
+    });
+
+    if (!existing) {
+      return res.status(404).json({ error: 'シフトが見つかりません' });
+    }
+
+    await prisma.shift.delete({
+      where: { id: req.params.id }
+    });
+
+    res.status(204).send();
+  } catch (error) {
+    console.error('Error deleting shift:', error);
+    res.status(500).json({ error: 'シフトの削除に失敗しました' });
+  }
 });
 
 // POST bulk create/update shifts
-router.post('/bulk', (req, res) => {
-  const { items } = req.body;
-  const insert = db.prepare(`
-    INSERT OR REPLACE INTO shifts (id, staff_id, date, pattern_id)
-    VALUES (?, ?, ?, ?)
-  `);
+router.post('/bulk', authMiddleware, async (req, res) => {
+  try {
+    const { items } = req.body;
+    const tenantId = req.tenantId!;
 
-  const transaction = db.transaction((items: Array<{ id?: string; staffId: string; date: string; patternId: string }>) => {
-    for (const item of items) {
-      insert.run(item.id || uuidv4(), item.staffId, item.date, item.patternId);
-    }
-  });
+    // Use transaction for bulk operations
+    await prisma.$transaction(async (tx) => {
+      for (const item of items as Array<{ id?: string; staffId: string; date: string; patternId: string }>) {
+        // Use upsert to handle both create and update
+        await tx.shift.upsert({
+          where: {
+            tenantId_staffId_date: {
+              tenantId,
+              staffId: item.staffId,
+              date: item.date
+            }
+          },
+          update: { patternId: item.patternId },
+          create: {
+            tenantId,
+            staffId: item.staffId,
+            date: item.date,
+            patternId: item.patternId
+          }
+        });
+      }
+    });
 
-  transaction(items);
-  res.json({ success: true, count: items.length });
+    res.json({ success: true, count: items.length });
+  } catch (error) {
+    console.error('Error bulk creating shifts:', error);
+    res.status(500).json({ error: 'シフトの一括作成に失敗しました' });
+  }
 });
 
 // POST auto-generate shifts for a month
-router.post('/auto-generate', (req, res) => {
-  const { month, clearExisting } = req.body;
+router.post('/auto-generate', authMiddleware, async (req, res) => {
+  try {
+    const { month, clearExisting } = req.body;
+    const tenantId = req.tenantId!;
 
-  if (!month || !/^\d{4}-\d{2}$/.test(month)) {
-    return res.status(400).json({ error: '月の形式が正しくありません (YYYY-MM)' });
-  }
+    if (!month || !/^\d{4}-\d{2}$/.test(month)) {
+      return res.status(400).json({ error: '月の形式が正しくありません (YYYY-MM)' });
+    }
 
-  // Clear existing shifts if requested
-  if (clearExisting) {
-    clearShifts(month);
-  }
+    // Clear existing shifts if requested
+    if (clearExisting) {
+      await clearShifts(tenantId, month);
+    }
 
-  // Generate shifts
-  const result = generateShifts(month);
+    // Generate shifts
+    const result = await generateShifts(tenantId, month);
 
-  if (result.success) {
-    res.json({
-      success: true,
-      message: `${result.shiftsGenerated}件のシフトを生成しました`,
-      shiftsGenerated: result.shiftsGenerated,
-      warnings: result.warnings
-    });
-  } else {
-    res.status(500).json({
-      success: false,
-      message: 'シフト生成に失敗しました',
-      errors: result.errors,
-      warnings: result.warnings
-    });
+    if (result.success) {
+      res.json({
+        success: true,
+        message: `${result.shiftsGenerated}件のシフトを生成しました`,
+        shiftsGenerated: result.shiftsGenerated,
+        warnings: result.warnings
+      });
+    } else {
+      res.status(500).json({
+        success: false,
+        message: 'シフト生成に失敗しました',
+        errors: result.errors,
+        warnings: result.warnings
+      });
+    }
+  } catch (error) {
+    console.error('Error auto-generating shifts:', error);
+    res.status(500).json({ error: 'シフトの自動生成に失敗しました' });
   }
 });
 
 // DELETE clear shifts for a month
-router.delete('/month/:month', (req, res) => {
-  const { month } = req.params;
+router.delete('/month/:month', authMiddleware, async (req, res) => {
+  try {
+    const { month } = req.params;
+    const tenantId = req.tenantId!;
 
-  if (!/^\d{4}-\d{2}$/.test(month)) {
-    return res.status(400).json({ error: '月の形式が正しくありません (YYYY-MM)' });
+    if (!/^\d{4}-\d{2}$/.test(month)) {
+      return res.status(400).json({ error: '月の形式が正しくありません (YYYY-MM)' });
+    }
+
+    const deleted = await clearShifts(tenantId, month);
+    res.json({ success: true, deleted });
+  } catch (error) {
+    console.error('Error clearing shifts:', error);
+    res.status(500).json({ error: 'シフトの削除に失敗しました' });
   }
-
-  const deleted = clearShifts(month);
-  res.json({ success: true, deleted });
 });
 
 export default router;

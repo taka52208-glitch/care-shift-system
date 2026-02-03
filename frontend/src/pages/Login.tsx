@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import './Login.css'
 
@@ -18,7 +18,7 @@ function Login() {
 
     try {
       await login(email, password)
-      navigate('/dashboard')
+      navigate('/app/dashboard')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'ログインに失敗しました')
     } finally {
@@ -29,9 +29,12 @@ function Login() {
   return (
     <div className="login-container">
       <div className="login-card">
+        <Link to="/" className="login-back">
+          ← トップに戻る
+        </Link>
         <div className="login-header">
           <span className="login-logo">🏥</span>
-          <h1>介護シフト作成システム</h1>
+          <h1>CareShift</h1>
           <p>ログインしてください</p>
         </div>
         {error && <div className="login-error">{error}</div>}
@@ -63,8 +66,10 @@ function Login() {
           </button>
         </form>
         <div className="login-hint">
-          <p>テストアカウント:</p>
-          <p>admin@example.com / admin123</p>
+          <p>
+            アカウントをお持ちでない場合は{' '}
+            <Link to="/register">新規登録</Link>
+          </p>
         </div>
       </div>
     </div>

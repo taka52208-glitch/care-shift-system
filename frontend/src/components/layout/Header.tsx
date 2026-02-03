@@ -14,7 +14,7 @@ function Header() {
   return (
     <header className="header">
       <div className="header-left">
-        <h1 className="header-title">介護シフト作成システム</h1>
+        <h1 className="header-title">CareShift</h1>
       </div>
       <div className="header-right">
         <div className="header-user">

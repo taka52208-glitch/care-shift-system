@@ -1,74 +1,110 @@
 import { Router } from 'express';
-import { v4 as uuidv4 } from 'uuid';
-import { db } from '../config/database.js';
+import { authMiddleware } from '../middleware/auth.js';
+import { toStaffResponse } from '../types/index.js';
+import { prisma } from '../lib/prisma.js';
 
 const router = Router();
 
-interface StaffRow {
-  id: string;
-  name: string;
-  qualification: string;
-  employment_type: string;
-  phone: string;
-  email: string | null;
-  created_at: string;
-}
-
-const toStaff = (row: StaffRow) => ({
-  id: row.id,
-  name: row.name,
-  qualification: row.qualification,
-  employmentType: row.employment_type,
-  phone: row.phone,
-  email: row.email,
-  createdAt: row.created_at
-});
-
 // GET all staff
-router.get('/', (req, res) => {
-  const rows = db.prepare('SELECT * FROM staff ORDER BY name').all() as StaffRow[];
-  res.json(rows.map(toStaff));
+router.get('/', authMiddleware, async (req, res) => {
+  try {
+    const staffList = await prisma.staff.findMany({
+      where: { tenantId: req.tenantId! },
+      orderBy: { name: 'asc' }
+    });
+    res.json(staffList.map(toStaffResponse));
+  } catch (error) {
+    console.error('Error fetching staff list:', error);
+    res.status(500).json({ error: 'スタッフ一覧の取得に失敗しました' });
+  }
 });
 
 // GET staff by ID
-router.get('/:id', (req, res) => {
-  const row = db.prepare('SELECT * FROM staff WHERE id = ?').get(req.params.id) as StaffRow | undefined;
-  if (!row) return res.status(404).json({ error: 'Staff not found' });
-  res.json(toStaff(row));
+router.get('/:id', authMiddleware, async (req, res) => {
+  try {
+    const staff = await prisma.staff.findFirst({
+      where: { id: req.params.id, tenantId: req.tenantId! }
+    });
+    if (!staff) {
+      return res.status(404).json({ error: 'スタッフが見つかりません' });
+    }
+    res.json(toStaffResponse(staff));
+  } catch (error) {
+    console.error('Error fetching staff:', error);
+    res.status(500).json({ error: 'スタッフの取得に失敗しました' });
+  }
 });
 
 // POST create staff
-router.post('/', (req, res) => {
-  const id = uuidv4();
-  const { name, qualification, employmentType, phone, email } = req.body;
-  db.prepare(`
-    INSERT INTO staff (id, name, qualification, employment_type, phone, email)
-    VALUES (?, ?, ?, ?, ?, ?)
-  `).run(id, name, qualification, employmentType, phone, email || null);
-
-  const row = db.prepare('SELECT * FROM staff WHERE id = ?').get(id) as StaffRow;
-  res.status(201).json(toStaff(row));
+router.post('/', authMiddleware, async (req, res) => {
+  try {
+    const { name, qualification, employmentType, phone, email } = req.body;
+    const staff = await prisma.staff.create({
+      data: {
+        name,
+        qualification: qualification || null,
+        employmentType: employmentType || null,
+        phone: phone || null,
+        email: email || null,
+        tenantId: req.tenantId!,
+      }
+    });
+    res.status(201).json(toStaffResponse(staff));
+  } catch (error) {
+    console.error('Error creating staff:', error);
+    res.status(500).json({ error: 'スタッフの作成に失敗しました' });
+  }
 });
 
 // PUT update staff
-router.put('/:id', (req, res) => {
-  const { name, qualification, employmentType, phone, email } = req.body;
-  const result = db.prepare(`
-    UPDATE staff SET name = ?, qualification = ?, employment_type = ?, phone = ?, email = ?
-    WHERE id = ?
-  `).run(name, qualification, employmentType, phone, email || null, req.params.id);
+router.put('/:id', authMiddleware, async (req, res) => {
+  try {
+    const { name, qualification, employmentType, phone, email } = req.body;
 
-  if (result.changes === 0) return res.status(404).json({ error: 'Staff not found' });
+    // Check if staff exists
+    const existing = await prisma.staff.findFirst({
+      where: { id: req.params.id, tenantId: req.tenantId! }
+    });
+    if (!existing) {
+      return res.status(404).json({ error: 'スタッフが見つかりません' });
+    }
 
-  const row = db.prepare('SELECT * FROM staff WHERE id = ?').get(req.params.id) as StaffRow;
-  res.json(toStaff(row));
+    const staff = await prisma.staff.update({
+      where: { id: req.params.id },
+      data: {
+        name,
+        qualification: qualification || null,
+        employmentType: employmentType || null,
+        phone: phone || null,
+        email: email || null,
+      }
+    });
+    res.json(toStaffResponse(staff));
+  } catch (error) {
+    console.error('Error updating staff:', error);
+    res.status(500).json({ error: 'スタッフの更新に失敗しました' });
+  }
 });
 
 // DELETE staff
-router.delete('/:id', (req, res) => {
-  const result = db.prepare('DELETE FROM staff WHERE id = ?').run(req.params.id);
-  if (result.changes === 0) return res.status(404).json({ error: 'Staff not found' });
-  res.status(204).send();
+router.delete('/:id', authMiddleware, async (req, res) => {
+  try {
+    // Check if staff exists
+    const existing = await prisma.staff.findFirst({
+      where: { id: req.params.id, tenantId: req.tenantId! }
+    });
+    if (!existing) {
+      return res.status(404).json({ error: 'スタッフが見つかりません' });
+    }
+
+    await prisma.staff.delete({
+      where: { id: req.params.id }
+    });
+    res.status(204).send();
+  } catch (error) {
+    console.error('Error deleting staff:', error);
+    res.status(500).json({ error: 'スタッフの削除に失敗しました' });
+  }
 });
 
 export default router;

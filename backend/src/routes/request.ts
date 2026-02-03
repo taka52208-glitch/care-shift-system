@@ -1,88 +1,155 @@
 import { Router } from 'express';
-import { v4 as uuidv4 } from 'uuid';
-import { db } from '../config/database.js';
+import { authMiddleware } from '../middleware/auth.js';
+import { toShiftRequestResponse } from '../types/index.js';
+import { prisma } from '../lib/prisma.js';
+import { RequestStatus } from '@prisma/client';
 
 const router = Router();
 
-interface RequestRow {
-  id: string;
-  staff_id: string;
-  staff_name: string;
-  date: string;
-  request_type: string;
-  reason: string | null;
-  status: string;
-  created_at: string;
-}
-
-const toRequest = (row: RequestRow) => ({
-  id: row.id,
-  staffId: row.staff_id,
-  staffName: row.staff_name,
-  date: row.date,
-  requestType: row.request_type,
-  reason: row.reason,
-  status: row.status,
-  createdAt: row.created_at
-});
-
 // GET all requests
-router.get('/', (req, res) => {
-  const { status, month } = req.query;
-  let sql = 'SELECT * FROM requests WHERE 1=1';
-  const params: string[] = [];
+router.get('/', authMiddleware, async (req, res) => {
+  try {
+    const { status, month } = req.query;
 
-  if (status && typeof status === 'string') {
-    sql += ' AND status = ?';
-    params.push(status);
-  }
-  if (month && typeof month === 'string') {
-    sql += ' AND date LIKE ?';
-    params.push(`${month}%`);
-  }
-  sql += ' ORDER BY created_at DESC';
+    const where: {
+      tenantId: string;
+      status?: RequestStatus;
+      date?: { startsWith: string };
+    } = { tenantId: req.tenantId! };
 
-  const rows = db.prepare(sql).all(...params) as RequestRow[];
-  res.json(rows.map(toRequest));
+    if (status && typeof status === 'string') {
+      where.status = status.toUpperCase() as RequestStatus;
+    }
+    if (month && typeof month === 'string') {
+      where.date = { startsWith: month };
+    }
+
+    const requests = await prisma.shiftRequest.findMany({
+      where,
+      include: { staff: { select: { name: true } } },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    res.json(requests.map(toShiftRequestResponse));
+  } catch (error) {
+    console.error('Error fetching requests:', error);
+    res.status(500).json({ error: '希望シフト一覧の取得に失敗しました' });
+  }
 });
 
 // GET request by ID
-router.get('/:id', (req, res) => {
-  const row = db.prepare('SELECT * FROM requests WHERE id = ?').get(req.params.id) as RequestRow | undefined;
-  if (!row) return res.status(404).json({ error: 'Request not found' });
-  res.json(toRequest(row));
+router.get('/:id', authMiddleware, async (req, res) => {
+  try {
+    const request = await prisma.shiftRequest.findFirst({
+      where: { id: req.params.id, tenantId: req.tenantId! },
+      include: { staff: { select: { name: true } } }
+    });
+
+    if (!request) {
+      return res.status(404).json({ error: '希望シフトが見つかりません' });
+    }
+
+    res.json(toShiftRequestResponse(request));
+  } catch (error) {
+    console.error('Error fetching request:', error);
+    res.status(500).json({ error: '希望シフトの取得に失敗しました' });
+  }
 });
 
 // POST create request
-router.post('/', (req, res) => {
-  const id = uuidv4();
-  const { staffId, staffName, date, requestType, reason } = req.body;
+router.post('/', authMiddleware, async (req, res) => {
+  try {
+    const { staffId, date, requestType, reason } = req.body;
 
-  db.prepare(`
-    INSERT INTO requests (id, staff_id, staff_name, date, request_type, reason, status)
-    VALUES (?, ?, ?, ?, ?, ?, 'pending')
-  `).run(id, staffId, staffName, date, requestType, reason || null);
+    // Validate staff exists
+    const staff = await prisma.staff.findFirst({
+      where: { id: staffId, tenantId: req.tenantId! }
+    });
+    if (!staff) {
+      return res.status(400).json({ error: '指定されたスタッフが見つかりません' });
+    }
 
-  const row = db.prepare('SELECT * FROM requests WHERE id = ?').get(id) as RequestRow;
-  res.status(201).json(toRequest(row));
+    const request = await prisma.shiftRequest.create({
+      data: {
+        staffId,
+        date,
+        requestType,
+        reason: reason || null,
+        status: RequestStatus.PENDING,
+        tenantId: req.tenantId!
+      }
+    });
+
+    // Fetch with staff name for response
+    const requestWithStaff = await prisma.shiftRequest.findUnique({
+      where: { id: request.id },
+      include: { staff: { select: { name: true } } }
+    });
+
+    res.status(201).json(toShiftRequestResponse(requestWithStaff!));
+  } catch (error) {
+    console.error('Error creating request:', error);
+    res.status(500).json({ error: '希望シフトの作成に失敗しました' });
+  }
 });
 
 // PUT update request status
-router.put('/:id/status', (req, res) => {
-  const { status } = req.body;
-  const result = db.prepare('UPDATE requests SET status = ? WHERE id = ?').run(status, req.params.id);
+router.put('/:id/status', authMiddleware, async (req, res) => {
+  try {
+    const { status } = req.body;
 
-  if (result.changes === 0) return res.status(404).json({ error: 'Request not found' });
+    // Check if request exists
+    const existing = await prisma.shiftRequest.findFirst({
+      where: { id: req.params.id, tenantId: req.tenantId! }
+    });
+    if (!existing) {
+      return res.status(404).json({ error: '希望シフトが見つかりません' });
+    }
 
-  const row = db.prepare('SELECT * FROM requests WHERE id = ?').get(req.params.id) as RequestRow;
-  res.json(toRequest(row));
+    // Convert status to enum
+    const statusEnum = status.toUpperCase() as RequestStatus;
+    if (!Object.values(RequestStatus).includes(statusEnum)) {
+      return res.status(400).json({ error: '無効なステータスです' });
+    }
+
+    const request = await prisma.shiftRequest.update({
+      where: { id: req.params.id },
+      data: { status: statusEnum }
+    });
+
+    // Fetch with staff name for response
+    const requestWithStaff = await prisma.shiftRequest.findUnique({
+      where: { id: request.id },
+      include: { staff: { select: { name: true } } }
+    });
+
+    res.json(toShiftRequestResponse(requestWithStaff!));
+  } catch (error) {
+    console.error('Error updating request status:', error);
+    res.status(500).json({ error: '希望シフトのステータス更新に失敗しました' });
+  }
 });
 
 // DELETE request
-router.delete('/:id', (req, res) => {
-  const result = db.prepare('DELETE FROM requests WHERE id = ?').run(req.params.id);
-  if (result.changes === 0) return res.status(404).json({ error: 'Request not found' });
-  res.status(204).send();
+router.delete('/:id', authMiddleware, async (req, res) => {
+  try {
+    // Check if request exists
+    const existing = await prisma.shiftRequest.findFirst({
+      where: { id: req.params.id, tenantId: req.tenantId! }
+    });
+    if (!existing) {
+      return res.status(404).json({ error: '希望シフトが見つかりません' });
+    }
+
+    await prisma.shiftRequest.delete({
+      where: { id: existing.id }
+    });
+
+    res.status(204).send();
+  } catch (error) {
+    console.error('Error deleting request:', error);
+    res.status(500).json({ error: '希望シフトの削除に失敗しました' });
+  }
 });
 
 export default router;

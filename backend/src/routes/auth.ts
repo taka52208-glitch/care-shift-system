@@ -1,74 +1,307 @@
-import { Router } from 'express';
+import { Router, Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
-import { db } from '../config/database.js';
+import { prisma } from '../lib/prisma.js';
+import { generateToken, authMiddleware } from '../middleware/auth.js';
+import type { RegisterRequest, LoginRequest } from '../types/index.js';
 
 const router = Router();
-const JWT_SECRET = process.env.JWT_SECRET || 'shift-system-secret-key-2024';
 
-interface UserRow {
-  id: string;
-  email: string;
-  password: string;
-  name: string;
-  role: string;
-  created_at: string;
-}
+/**
+ * POST /api/auth/register
+ * Register new tenant and admin user
+ */
+router.post('/register', async (req: Request, res: Response) => {
+  try {
+    const { tenantName, subdomain, email, password, userName } = req.body as RegisterRequest;
 
-// POST login
-router.post('/login', (req, res) => {
-  const { email, password } = req.body;
+    // Validation
+    if (!tenantName || !subdomain || !email || !password || !userName) {
+      return res.status(400).json({
+        error: '全ての項目を入力してください',
+        code: 'VALIDATION_ERROR',
+      });
+    }
 
-  if (!email || !password) {
-    return res.status(400).json({ error: 'メールアドレスとパスワードを入力してください' });
+    // Validate subdomain format
+    const subdomainRegex = /^[a-z0-9][a-z0-9-]{1,30}[a-z0-9]$/;
+    if (!subdomainRegex.test(subdomain)) {
+      return res.status(400).json({
+        error: 'サブドメインは3-32文字の英数字とハイフンのみ使用可能です（ハイフンは先頭・末尾不可）',
+        code: 'INVALID_SUBDOMAIN',
+      });
+    }
+
+    // Check if subdomain already exists
+    const existingTenant = await prisma.tenant.findUnique({
+      where: { subdomain },
+    });
+
+    if (existingTenant) {
+      return res.status(409).json({
+        error: 'このサブドメインは既に使用されています',
+        code: 'SUBDOMAIN_EXISTS',
+      });
+    }
+
+    // Create tenant and admin user in transaction
+    const result = await prisma.$transaction(async (tx) => {
+      // Create tenant
+      const tenant = await tx.tenant.create({
+        data: {
+          name: tenantName,
+          subdomain,
+          subscriptionStatus: 'TRIALING',
+          trialEndsAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000), // 14 days trial
+        },
+      });
+
+      // Create admin user
+      const hashedPassword = await bcrypt.hash(password, 10);
+      const user = await tx.user.create({
+        data: {
+          tenantId: tenant.id,
+          email,
+          passwordHash: hashedPassword,
+          name: userName,
+          role: 'ADMIN',
+        },
+      });
+
+      // Create default shift patterns
+      const patterns = [
+        { name: '早番', code: 'E', startTime: '07:00', endTime: '16:00', breakTime: 60, color: '#fbbf24' },
+        { name: '日勤', code: 'D', startTime: '09:00', endTime: '18:00', breakTime: 60, color: '#22c55e' },
+        { name: '遅番', code: 'L', startTime: '12:00', endTime: '21:00', breakTime: 60, color: '#3b82f6' },
+        { name: '夜勤', code: 'N', startTime: '21:00', endTime: '07:00', breakTime: 120, color: '#8b5cf6' },
+        { name: '公休', code: 'O', startTime: '-', endTime: '-', breakTime: 0, color: '#94a3b8' },
+      ];
+
+      await tx.shiftPattern.createMany({
+        data: patterns.map((p) => ({ ...p, tenantId: tenant.id })),
+      });
+
+      // Create default constraints
+      const constraints = [
+        { category: 'staffing', key: 'minDayStaff', value: '3' },
+        { category: 'staffing', key: 'minNightStaff', value: '2' },
+        { category: 'staffing', key: 'minQualifiedDay', value: '1' },
+        { category: 'workLimit', key: 'maxConsecutiveDays', value: '5' },
+        { category: 'workLimit', key: 'maxNightShifts', value: '8' },
+        { category: 'workLimit', key: 'restAfterNight', value: '1' },
+        { category: 'holiday', key: 'weeklyHolidays', value: '2' },
+        { category: 'holiday', key: 'minMonthlyHolidays', value: '8' },
+      ];
+
+      await tx.constraint.createMany({
+        data: constraints.map((c) => ({ ...c, tenantId: tenant.id })),
+      });
+
+      return { tenant, user };
+    });
+
+    // Generate token
+    const token = generateToken({
+      userId: result.user.id,
+      tenantId: result.tenant.id,
+      email: result.user.email,
+      role: result.user.role,
+    });
+
+    res.status(201).json({
+      message: '登録が完了しました',
+      token,
+      user: {
+        id: result.user.id,
+        email: result.user.email,
+        name: result.user.name,
+        role: result.user.role,
+      },
+      tenant: {
+        id: result.tenant.id,
+        name: result.tenant.name,
+        subdomain: result.tenant.subdomain,
+      },
+    });
+  } catch (error) {
+    console.error('Registration error:', error);
+    res.status(500).json({
+      error: '登録中にエラーが発生しました',
+      code: 'REGISTRATION_ERROR',
+    });
   }
+});
 
-  const user = db.prepare('SELECT * FROM users WHERE email = ?').get(email) as UserRow | undefined;
+/**
+ * POST /api/auth/login
+ * Login with email and password
+ */
+router.post('/login', async (req: Request, res: Response) => {
+  try {
+    const { email, password } = req.body as LoginRequest;
 
-  if (!user) {
-    return res.status(401).json({ error: 'メールアドレスまたはパスワードが正しくありません' });
+    if (!email || !password) {
+      return res.status(400).json({
+        error: 'メールアドレスとパスワードを入力してください',
+        code: 'VALIDATION_ERROR',
+      });
+    }
+
+    // Get tenant from header or subdomain (optional for login)
+    let tenantId = req.headers['x-tenant-id'] as string | undefined;
+    const subdomain = req.headers['x-tenant-subdomain'] as string | undefined;
+
+    // If subdomain is provided, look up tenant
+    if (subdomain && !tenantId) {
+      const tenant = await prisma.tenant.findUnique({
+        where: { subdomain },
+        select: { id: true },
+      });
+      if (tenant) {
+        tenantId = tenant.id;
+      }
+    }
+
+    // Find user (with optional tenant filter)
+    const user = await prisma.user.findFirst({
+      where: {
+        email,
+        ...(tenantId && { tenantId }),
+      },
+      include: {
+        tenant: {
+          select: {
+            id: true,
+            name: true,
+            subdomain: true,
+            subscriptionStatus: true,
+          },
+        },
+      },
+    });
+
+    if (!user) {
+      return res.status(401).json({
+        error: 'メールアドレスまたはパスワードが正しくありません',
+        code: 'INVALID_CREDENTIALS',
+      });
+    }
+
+    // Verify password
+    const isValidPassword = await bcrypt.compare(password, user.passwordHash);
+    if (!isValidPassword) {
+      return res.status(401).json({
+        error: 'メールアドレスまたはパスワードが正しくありません',
+        code: 'INVALID_CREDENTIALS',
+      });
+    }
+
+    // Check subscription status
+    if (user.tenant.subscriptionStatus !== 'TRIALING' &&
+        user.tenant.subscriptionStatus !== 'ACTIVE') {
+      return res.status(403).json({
+        error: 'サブスクリプションが無効です。お支払いをご確認ください。',
+        code: 'SUBSCRIPTION_INACTIVE',
+      });
+    }
+
+    // Generate token
+    const token = generateToken({
+      userId: user.id,
+      tenantId: user.tenantId,
+      email: user.email,
+      role: user.role,
+    });
+
+    res.json({
+      token,
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+      },
+      tenant: {
+        id: user.tenant.id,
+        name: user.tenant.name,
+        subdomain: user.tenant.subdomain,
+      },
+    });
+  } catch (error) {
+    console.error('Login error:', error);
+    res.status(500).json({
+      error: 'ログイン中にエラーが発生しました',
+      code: 'LOGIN_ERROR',
+    });
   }
+});
 
-  const isValidPassword = bcrypt.compareSync(password, user.password);
-  if (!isValidPassword) {
-    return res.status(401).json({ error: 'メールアドレスまたはパスワードが正しくありません' });
-  }
+/**
+ * GET /api/auth/me
+ * Get current user info
+ */
+router.get('/me', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: req.user!.userId },
+      include: {
+        tenant: {
+          select: {
+            id: true,
+            name: true,
+            subdomain: true,
+            subscriptionStatus: true,
+          },
+        },
+      },
+    });
 
-  const token = jwt.sign(
-    { id: user.id, email: user.email, name: user.name, role: user.role },
-    JWT_SECRET,
-    { expiresIn: '24h' }
-  );
+    if (!user) {
+      return res.status(404).json({
+        error: 'ユーザーが見つかりません',
+        code: 'USER_NOT_FOUND',
+      });
+    }
 
-  res.json({
-    token,
-    user: {
+    res.json({
       id: user.id,
       email: user.email,
       name: user.name,
-      role: user.role
-    }
-  });
+      role: user.role,
+      tenant: {
+        id: user.tenant.id,
+        name: user.tenant.name,
+        subdomain: user.tenant.subdomain,
+      },
+    });
+  } catch (error) {
+    console.error('Get user error:', error);
+    res.status(500).json({
+      error: 'ユーザー情報の取得中にエラーが発生しました',
+      code: 'GET_USER_ERROR',
+    });
+  }
 });
 
-// GET current user
-router.get('/me', (req, res) => {
-  const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return res.status(401).json({ error: '認証が必要です' });
-  }
-
-  const token = authHeader.split(' ')[1];
+/**
+ * POST /api/auth/check-subdomain
+ * Check if subdomain is available
+ */
+router.post('/check-subdomain', async (req: Request, res: Response) => {
   try {
-    const decoded = jwt.verify(token, JWT_SECRET) as { id: string; email: string; name: string; role: string };
-    res.json({
-      id: decoded.id,
-      email: decoded.email,
-      name: decoded.name,
-      role: decoded.role
+    const { subdomain } = req.body;
+
+    if (!subdomain) {
+      return res.status(400).json({ available: false, error: 'サブドメインを入力してください' });
+    }
+
+    const existing = await prisma.tenant.findUnique({
+      where: { subdomain },
     });
-  } catch {
-    res.status(401).json({ error: 'トークンが無効です' });
+
+    res.json({ available: !existing });
+  } catch (error) {
+    console.error('Check subdomain error:', error);
+    res.status(500).json({ available: false, error: 'エラーが発生しました' });
   }
 });
 

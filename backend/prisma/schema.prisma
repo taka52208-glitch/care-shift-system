@@ -1,0 +1,192 @@
+// Prisma Schema for Care Shift System
+// Multi-tenant SaaS Architecture
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// Tenant (事業所)
+// ============================================
+model Tenant {
+  id                   String             @id @default(uuid())
+  name                 String // 事業所名
+  subdomain            String             @unique // サブドメイン
+  stripeCustomerId     String?            @map("stripe_customer_id")
+  stripeSubscriptionId String?            @map("stripe_subscription_id")
+  subscriptionStatus   SubscriptionStatus @default(TRIALING) @map("subscription_status")
+  trialEndsAt          DateTime?          @map("trial_ends_at")
+  currentPeriodEnd     DateTime?          @map("current_period_end")
+  createdAt            DateTime           @default(now()) @map("created_at")
+  updatedAt            DateTime           @updatedAt @map("updated_at")
+
+  // Relations
+  users       User[]
+  staff       Staff[]
+  patterns    ShiftPattern[]
+  shifts      Shift[]
+  requests    ShiftRequest[]
+  constraints Constraint[]
+
+  @@map("tenants")
+}
+
+enum SubscriptionStatus {
+  TRIALING
+  ACTIVE
+  CANCELED
+  PAST_DUE
+  UNPAID
+}
+
+// ============================================
+// User (ユーザー - テナント所属)
+// ============================================
+model User {
+  id           String   @id @default(uuid())
+  tenantId     String   @map("tenant_id")
+  email        String
+  passwordHash String   @map("password_hash")
+  name         String
+  role         UserRole @default(ADMIN)
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, email]) // テナント内でメール一意
+  @@index([tenantId])
+  @@map("users")
+}
+
+enum UserRole {
+  ADMIN
+  MANAGER
+  STAFF
+}
+
+// ============================================
+// Staff (スタッフ)
+// ============================================
+model Staff {
+  id             String   @id @default(uuid())
+  tenantId       String   @map("tenant_id")
+  name           String
+  qualification  String?
+  employmentType String?  @map("employment_type")
+  phone          String?
+  email          String?
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  tenant   Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  shifts   Shift[]
+  requests ShiftRequest[]
+
+  @@index([tenantId])
+  @@map("staff")
+}
+
+// ============================================
+// ShiftPattern (シフトパターン)
+// ============================================
+model ShiftPattern {
+  id        String   @id @default(uuid())
+  tenantId  String   @map("tenant_id")
+  name      String
+  code      String
+  startTime String   @map("start_time")
+  endTime   String   @map("end_time")
+  breakTime Int      @default(0) @map("break_time") // 分単位
+  color     String   @default("#6b7280")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  tenant Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  shifts Shift[]
+
+  @@unique([tenantId, code]) // テナント内でコード一意
+  @@index([tenantId])
+  @@map("shift_patterns")
+}
+
+// ============================================
+// Shift (シフト)
+// ============================================
+model Shift {
+  id        String   @id @default(uuid())
+  tenantId  String   @map("tenant_id")
+  staffId   String   @map("staff_id")
+  patternId String   @map("pattern_id")
+  date      String // YYYY-MM-DD形式
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  tenant  Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  staff   Staff        @relation(fields: [staffId], references: [id], onDelete: Cascade)
+  pattern ShiftPattern @relation(fields: [patternId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, staffId, date]) // 同日に同スタッフは1シフトのみ
+  @@index([tenantId])
+  @@index([tenantId, date])
+  @@index([tenantId, staffId])
+  @@map("shifts")
+}
+
+// ============================================
+// ShiftRequest (希望シフト)
+// ============================================
+model ShiftRequest {
+  id          String        @id @default(uuid())
+  tenantId    String        @map("tenant_id")
+  staffId     String        @map("staff_id")
+  date        String // YYYY-MM-DD形式
+  requestType String        @map("request_type")
+  reason      String?
+  status      RequestStatus @default(PENDING)
+  createdAt   DateTime      @default(now()) @map("created_at")
+  updatedAt   DateTime      @updatedAt @map("updated_at")
+
+  // Relations
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  staff  Staff  @relation(fields: [staffId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([tenantId, date])
+  @@map("shift_requests")
+}
+
+enum RequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+// ============================================
+// Constraint (制約条件)
+// ============================================
+model Constraint {
+  id        String   @id @default(uuid())
+  tenantId  String   @map("tenant_id")
+  category  String
+  key       String
+  value     String // JSON or string value
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, category, key]) // テナント内でカテゴリ+キー一意
+  @@index([tenantId])
+  @@map("constraints")
+}
