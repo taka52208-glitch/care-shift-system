@@ -41,14 +41,24 @@ function Dashboard() {
 
   const loadDashboard = async () => {
     try {
+      const token = localStorage.getItem('token')
+      const headers = token ? { Authorization: `Bearer ${token}` } : {}
+
       const [statsRes, weeklyRes, activityRes] = await Promise.all([
-        fetch(`${API_BASE}/dashboard/stats`),
-        fetch(`${API_BASE}/dashboard/weekly`),
-        fetch(`${API_BASE}/dashboard/activity`)
+        fetch(`${API_BASE}/dashboard/stats`, { headers }),
+        fetch(`${API_BASE}/dashboard/weekly`, { headers }),
+        fetch(`${API_BASE}/dashboard/activity`, { headers })
       ])
-      setStats(await statsRes.json())
-      setWeekly(await weeklyRes.json())
-      setActivity(await activityRes.json())
+
+      if (statsRes.ok) setStats(await statsRes.json())
+      if (weeklyRes.ok) {
+        const data = await weeklyRes.json()
+        setWeekly(Array.isArray(data) ? data : [])
+      }
+      if (activityRes.ok) {
+        const data = await activityRes.json()
+        setActivity(Array.isArray(data) ? data : [])
+      }
     } catch (e) {
       console.error('Failed to load dashboard:', e)
     } finally {
