@@ -21,6 +21,11 @@ router.post('/stripe', async (req: Request, res: Response) => {
     return res.status(500).json({ error: 'Webhook not configured' });
   }
 
+  if (!stripe) {
+    console.error('Stripe not configured');
+    return res.status(500).json({ error: 'Stripe not configured' });
+  }
+
   let event: Stripe.Event;
 
   try {

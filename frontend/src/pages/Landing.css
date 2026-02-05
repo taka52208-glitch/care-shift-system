@@ -308,6 +308,22 @@
   color: var(--text-primary);
 }
 
+.footer-links {
+  display: flex;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.footer-links a {
+  color: var(--text-secondary);
+  text-decoration: none;
+  font-size: 0.875rem;
+}
+
+.footer-links a:hover {
+  color: var(--primary-color);
+}
+
 .footer-copyright {
   color: var(--text-secondary);
   font-size: 0.875rem;

@@ -2,6 +2,13 @@ import { stripe, PRICE_ID, TRIAL_DAYS } from '../lib/stripe.js';
 import { prisma } from '../lib/prisma.js';
 import { SubscriptionStatus } from '@prisma/client';
 
+function getStripe() {
+  if (!stripe) {
+    throw new Error('Stripe is not configured');
+  }
+  return stripe;
+}
+
 /**
  * Create a Stripe customer for a tenant
  */
@@ -10,7 +17,7 @@ export async function createStripeCustomer(
   email: string,
   name: string
 ): Promise<string> {
-  const customer = await stripe.customers.create({
+  const customer = await getStripe().customers.create({
     email,
     name,
     metadata: {
@@ -36,7 +43,7 @@ export async function createCheckoutSession(
   successUrl: string,
   cancelUrl: string
 ): Promise<string> {
-  const session = await stripe.checkout.sessions.create({
+  const session = await getStripe().checkout.sessions.create({
     customer: customerId,
     mode: 'subscription',
     line_items: [
@@ -68,7 +75,7 @@ export async function createPortalSession(
   customerId: string,
   returnUrl: string
 ): Promise<string> {
-  const session = await stripe.billingPortal.sessions.create({
+  const session = await getStripe().billingPortal.sessions.create({
     customer: customerId,
     return_url: returnUrl,
   });
@@ -146,12 +153,12 @@ export async function handleSubscriptionChange(
  * Cancel a subscription
  */
 export async function cancelSubscription(subscriptionId: string): Promise<void> {
-  await stripe.subscriptions.cancel(subscriptionId);
+  await getStripe().subscriptions.cancel(subscriptionId);
 }
 
 /**
  * Get subscription details
  */
 export async function getSubscription(subscriptionId: string) {
-  return stripe.subscriptions.retrieve(subscriptionId);
+  return getStripe().subscriptions.retrieve(subscriptionId);
 }

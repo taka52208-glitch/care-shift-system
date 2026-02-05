@@ -1,0 +1,140 @@
+.legal-page {
+  min-height: 100vh;
+  background: #f8fafc;
+}
+
+.legal-nav {
+  background: white;
+  padding: 1rem 2rem;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.legal-nav .nav-logo {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  text-decoration: none;
+  color: #1e293b;
+  font-weight: 700;
+  font-size: 1.25rem;
+}
+
+.legal-nav .nav-logo-icon {
+  font-size: 1.5rem;
+}
+
+.legal-content {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 3rem 2rem;
+  background: white;
+  min-height: calc(100vh - 80px);
+}
+
+.legal-content h1 {
+  font-size: 2rem;
+  color: #1e293b;
+  margin-bottom: 0.5rem;
+}
+
+.legal-updated {
+  color: #64748b;
+  margin-bottom: 2rem;
+}
+
+.legal-content section {
+  margin-bottom: 2rem;
+}
+
+.legal-content h2 {
+  font-size: 1.25rem;
+  color: #334155;
+  margin-bottom: 1rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.legal-content p {
+  color: #475569;
+  line-height: 1.8;
+  margin-bottom: 1rem;
+}
+
+.legal-content ul {
+  color: #475569;
+  line-height: 1.8;
+  padding-left: 1.5rem;
+  margin-bottom: 1rem;
+}
+
+.legal-content li {
+  margin-bottom: 0.5rem;
+}
+
+.legal-footer {
+  margin-top: 3rem;
+  padding-top: 2rem;
+  border-top: 1px solid #e2e8f0;
+  text-align: center;
+}
+
+.legal-footer a {
+  color: #3b82f6;
+  text-decoration: none;
+}
+
+.legal-footer a:hover {
+  text-decoration: underline;
+}
+
+/* 特商法テーブル */
+.tokushoho-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 2rem;
+}
+
+.tokushoho-table th,
+.tokushoho-table td {
+  padding: 1rem;
+  border: 1px solid #e2e8f0;
+  text-align: left;
+  vertical-align: top;
+}
+
+.tokushoho-table th {
+  background: #f8fafc;
+  color: #334155;
+  font-weight: 600;
+  width: 30%;
+}
+
+.tokushoho-table td {
+  color: #475569;
+  line-height: 1.6;
+}
+
+@media (max-width: 640px) {
+  .legal-content {
+    padding: 2rem 1rem;
+  }
+
+  .legal-content h1 {
+    font-size: 1.5rem;
+  }
+
+  .tokushoho-table th,
+  .tokushoho-table td {
+    display: block;
+    width: 100%;
+  }
+
+  .tokushoho-table th {
+    border-bottom: none;
+  }
+
+  .tokushoho-table td {
+    border-top: none;
+    padding-top: 0;
+  }
+}

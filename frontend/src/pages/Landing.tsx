@@ -146,8 +146,13 @@ function Landing() {
             <span className="nav-logo-icon">🏥</span>
             <span>CareShift</span>
           </div>
+          <div className="footer-links">
+            <Link to="/terms">利用規約</Link>
+            <Link to="/privacy">プライバシーポリシー</Link>
+            <Link to="/tokushoho">特定商取引法に基づく表記</Link>
+          </div>
           <p className="footer-copyright">
-            &copy; 2025 CareShift. All rights reserved.
+            &copy; 2026 CareShift. All rights reserved.
           </p>
         </div>
       </footer>

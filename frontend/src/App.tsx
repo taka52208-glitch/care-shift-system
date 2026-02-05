@@ -11,6 +11,9 @@ import Reports from './pages/Reports'
 import Login from './pages/Login'
 import Landing from './pages/Landing'
 import Register from './pages/Register'
+import Terms from './pages/Terms'
+import Privacy from './pages/Privacy'
+import Tokushoho from './pages/Tokushoho'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useAuth()
@@ -48,6 +51,11 @@ function App() {
       <Route path="/" element={<PublicRoute><Landing /></PublicRoute>} />
       <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
       <Route path="/register" element={<PublicRoute><Register /></PublicRoute>} />
+
+      {/* Legal pages */}
+      <Route path="/terms" element={<Terms />} />
+      <Route path="/privacy" element={<Privacy />} />
+      <Route path="/tokushoho" element={<Tokushoho />} />
 
       {/* Protected routes */}
       <Route
