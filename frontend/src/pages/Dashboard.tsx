@@ -1,4 +1,6 @@
 import { useState, useEffect } from 'react'
+import { Link } from 'react-router-dom'
+import { useBilling } from '../contexts/BillingContext'
 import './Dashboard.css'
 
 const API_BASE = import.meta.env.DEV ? 'http://localhost:3001/api' : 'https://care-shift-system.onrender.com/api'
@@ -34,6 +36,7 @@ function Dashboard() {
   const [weekly, setWeekly] = useState<WeeklyData[]>([])
   const [activity, setActivity] = useState<Activity[]>([])
   const [loading, setLoading] = useState(true)
+  const { billingStatus } = useBilling()
 
   useEffect(() => {
     loadDashboard()
@@ -82,6 +85,30 @@ function Dashboard() {
       <div className="page-header">
         <h1 className="page-title">ダッシュボード</h1>
       </div>
+
+      {billingStatus?.status === 'TRIALING' && billingStatus.trialDaysRemaining !== null && (
+        <div className="trial-banner">
+          <div className="trial-content">
+            <span className="trial-icon">⏰</span>
+            <span className="trial-text">
+              トライアル期間：残り<strong>{billingStatus.trialDaysRemaining}日</strong>
+            </span>
+          </div>
+          <Link to="/app/settings" className="trial-cta">
+            有料プランに申し込む →
+          </Link>
+        </div>
+      )}
+
+      {billingStatus?.status === 'PAST_DUE' && (
+        <div className="warning-banner">
+          <span className="warning-icon">⚠️</span>
+          <span className="warning-text">お支払いが確認できていません。</span>
+          <Link to="/app/settings" className="warning-cta">
+            支払い情報を確認 →
+          </Link>
+        </div>
+      )}
 
       <div className="stats-grid">
         <div className="stat-card">

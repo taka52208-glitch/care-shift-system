@@ -1,0 +1,140 @@
+.settings {
+  padding: 20px;
+}
+
+.settings-grid {
+  display: grid;
+  gap: 24px;
+  max-width: 800px;
+}
+
+.settings-card {
+  background: white;
+  border-radius: 8px;
+  padding: 24px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.settings-card .card-title {
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0 0 20px;
+  color: #1a1a2e;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.info-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.info-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.info-label {
+  color: #6b7280;
+  font-size: 14px;
+}
+
+.info-value {
+  font-weight: 500;
+  color: #1a1a2e;
+}
+
+.subscription-status {
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 13px;
+}
+
+.status-trialing {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.status-active {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.status-canceled {
+  background: #f3f4f6;
+  color: #6b7280;
+}
+
+.status-past-due {
+  background: #fef3c7;
+  color: #b45309;
+}
+
+.status-unpaid {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.status-none {
+  background: #f3f4f6;
+  color: #6b7280;
+}
+
+.billing-actions {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid #e5e7eb;
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.btn {
+  padding: 10px 20px;
+  border-radius: 6px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: none;
+  font-size: 14px;
+}
+
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  background: #3b82f6;
+  color: white;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: #2563eb;
+}
+
+.btn-secondary {
+  background: white;
+  color: #374151;
+  border: 1px solid #d1d5db;
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: #f9fafb;
+}
+
+.error-banner {
+  background: #fee2e2;
+  color: #dc2626;
+  padding: 12px 16px;
+  border-radius: 6px;
+  margin-bottom: 20px;
+}
+
+.loading {
+  padding: 40px;
+  text-align: center;
+  color: #6b7280;
+}

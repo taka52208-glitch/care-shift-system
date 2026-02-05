@@ -9,6 +9,7 @@ const menuItems = [
   { path: '/app/constraints', label: '制約条件', icon: '⚙️' },
   { path: '/app/requests', label: '希望シフト', icon: '📝' },
   { path: '/app/reports', label: 'レポート', icon: '📈' },
+  { path: '/app/settings', label: '設定', icon: '⚙️' },
 ]
 
 function Sidebar() {

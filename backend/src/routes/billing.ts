@@ -43,8 +43,8 @@ router.post('/checkout', authMiddleware, async (req, res) => {
     const checkoutUrl = await createCheckoutSession(
       tenantId,
       customerId,
-      successUrl || `${process.env.FRONTEND_URL}/billing/success`,
-      cancelUrl || `${process.env.FRONTEND_URL}/billing/cancel`
+      successUrl || `${process.env.FRONTEND_URL}/app/billing/success`,
+      cancelUrl || `${process.env.FRONTEND_URL}/app/billing/cancel`
     );
 
     res.json({ url: checkoutUrl });
@@ -79,7 +79,7 @@ router.post('/portal', authMiddleware, async (req, res) => {
     // Create portal session
     const portalUrl = await createPortalSession(
       tenant.stripeCustomerId,
-      returnUrl || `${process.env.FRONTEND_URL}/settings`
+      returnUrl || `${process.env.FRONTEND_URL}/app/settings`
     );
 
     res.json({ url: portalUrl });

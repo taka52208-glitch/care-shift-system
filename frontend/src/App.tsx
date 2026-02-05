@@ -8,6 +8,9 @@ import ShiftPatterns from './pages/ShiftPatterns'
 import Constraints from './pages/Constraints'
 import ShiftRequests from './pages/ShiftRequests'
 import Reports from './pages/Reports'
+import Settings from './pages/Settings'
+import BillingSuccess from './pages/BillingSuccess'
+import BillingCancel from './pages/BillingCancel'
 import Login from './pages/Login'
 import Landing from './pages/Landing'
 import Register from './pages/Register'
@@ -74,6 +77,9 @@ function App() {
         <Route path="constraints" element={<Constraints />} />
         <Route path="requests" element={<ShiftRequests />} />
         <Route path="reports" element={<Reports />} />
+        <Route path="settings" element={<Settings />} />
+        <Route path="billing/success" element={<BillingSuccess />} />
+        <Route path="billing/cancel" element={<BillingCancel />} />
       </Route>
 
       {/* Redirect old paths to new /app prefix */}
