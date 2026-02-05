@@ -1,7 +1,9 @@
 import { Router, Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
 import { prisma } from '../lib/prisma.js';
 import { generateToken, authMiddleware } from '../middleware/auth.js';
+import { sendWelcomeEmail, sendPasswordResetEmail } from '../lib/email.js';
 import type { RegisterRequest, LoginRequest } from '../types/index.js';
 
 const router = Router();
@@ -106,6 +108,9 @@ router.post('/register', async (req: Request, res: Response) => {
       email: result.user.email,
       role: result.user.role,
     });
+
+    // Send welcome email (async, don't wait)
+    sendWelcomeEmail(email, userName, tenantName).catch(console.error);
 
     res.status(201).json({
       message: '登録が完了しました',
@@ -302,6 +307,137 @@ router.post('/check-subdomain', async (req: Request, res: Response) => {
   } catch (error) {
     console.error('Check subdomain error:', error);
     res.status(500).json({ available: false, error: 'エラーが発生しました' });
+  }
+});
+
+/**
+ * POST /api/auth/forgot-password
+ * Request password reset
+ */
+router.post('/forgot-password', async (req: Request, res: Response) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({
+        error: 'メールアドレスを入力してください',
+        code: 'VALIDATION_ERROR',
+      });
+    }
+
+    // Find user by email
+    const user = await prisma.user.findFirst({
+      where: { email },
+    });
+
+    // Always return success to prevent email enumeration
+    if (!user) {
+      return res.json({
+        message: 'パスワードリセットのメールを送信しました（登録されている場合）',
+      });
+    }
+
+    // Generate reset token
+    const resetToken = crypto.randomBytes(32).toString('hex');
+    const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+
+    // Save token to database
+    await prisma.passwordResetToken.create({
+      data: {
+        email,
+        token: resetToken,
+        expiresAt,
+      },
+    });
+
+    // Send reset email
+    await sendPasswordResetEmail(email, resetToken);
+
+    res.json({
+      message: 'パスワードリセットのメールを送信しました（登録されている場合）',
+    });
+  } catch (error) {
+    console.error('Forgot password error:', error);
+    res.status(500).json({
+      error: 'エラーが発生しました',
+      code: 'FORGOT_PASSWORD_ERROR',
+    });
+  }
+});
+
+/**
+ * POST /api/auth/reset-password
+ * Reset password with token
+ */
+router.post('/reset-password', async (req: Request, res: Response) => {
+  try {
+    const { token, password } = req.body;
+
+    if (!token || !password) {
+      return res.status(400).json({
+        error: 'トークンと新しいパスワードを入力してください',
+        code: 'VALIDATION_ERROR',
+      });
+    }
+
+    if (password.length < 6) {
+      return res.status(400).json({
+        error: 'パスワードは6文字以上で入力してください',
+        code: 'PASSWORD_TOO_SHORT',
+      });
+    }
+
+    // Find valid token
+    const resetToken = await prisma.passwordResetToken.findFirst({
+      where: {
+        token,
+        expiresAt: { gt: new Date() },
+        usedAt: null,
+      },
+    });
+
+    if (!resetToken) {
+      return res.status(400).json({
+        error: 'リンクが無効または期限切れです',
+        code: 'INVALID_TOKEN',
+      });
+    }
+
+    // Find user
+    const user = await prisma.user.findFirst({
+      where: { email: resetToken.email },
+    });
+
+    if (!user) {
+      return res.status(400).json({
+        error: 'ユーザーが見つかりません',
+        code: 'USER_NOT_FOUND',
+      });
+    }
+
+    // Update password and mark token as used
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    await prisma.$transaction([
+      prisma.user.update({
+        where: { id: user.id },
+        data: { passwordHash: hashedPassword },
+      }),
+      prisma.passwordResetToken.update({
+        where: { id: resetToken.id },
+        data: { usedAt: new Date() },
+      }),
+    ]);
+
+    res.json({
+      message: 'パスワードが更新されました',
+    });
+  } catch (error) {
+    console.error('Reset password error:', error);
+    res.status(500).json({
+      error: 'エラーが発生しました',
+      code: 'RESET_PASSWORD_ERROR',
+    });
   }
 });
 

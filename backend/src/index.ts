@@ -5,6 +5,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { prisma } from './lib/prisma.js';
 import { tenantResolver } from './middleware/tenant.js';
+import { apiLimiter, authLimiter, registerLimiter, passwordResetLimiter } from './middleware/rateLimit.js';
 import authRoutes from './routes/auth.js';
 import dashboardRoutes from './routes/dashboard.js';
 import staffRoutes from './routes/staff.js';
@@ -34,6 +35,13 @@ app.use('/api/webhook/stripe', express.raw({ type: 'application/json' }));
 app.use('/api/webhook', webhookRoutes);
 
 app.use(express.json());
+
+// Rate limiting
+app.use('/api', apiLimiter);
+app.use('/api/auth/login', authLimiter);
+app.use('/api/auth/register', registerLimiter);
+app.use('/api/auth/forgot-password', passwordResetLimiter);
+app.use('/api/auth/reset-password', passwordResetLimiter);
 
 // Tenant resolver middleware (optional for some routes)
 app.use(tenantResolver);

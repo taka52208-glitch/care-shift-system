@@ -17,6 +17,8 @@ import Register from './pages/Register'
 import Terms from './pages/Terms'
 import Privacy from './pages/Privacy'
 import Tokushoho from './pages/Tokushoho'
+import ForgotPassword from './pages/ForgotPassword'
+import ResetPassword from './pages/ResetPassword'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useAuth()
@@ -59,6 +61,10 @@ function App() {
       <Route path="/terms" element={<Terms />} />
       <Route path="/privacy" element={<Privacy />} />
       <Route path="/tokushoho" element={<Tokushoho />} />
+
+      {/* Password reset */}
+      <Route path="/forgot-password" element={<ForgotPassword />} />
+      <Route path="/reset-password" element={<ResetPassword />} />
 
       {/* Protected routes */}
       <Route

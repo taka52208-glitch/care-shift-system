@@ -3,6 +3,7 @@ import Stripe from 'stripe';
 import { stripe } from '../lib/stripe.js';
 import { handleSubscriptionChange } from '../services/stripeService.js';
 import { prisma } from '../lib/prisma.js';
+import { sendPaymentSuccessEmail, sendPaymentFailedEmail } from '../lib/email.js';
 
 const router = Router();
 
@@ -88,6 +89,17 @@ router.post('/stripe', async (req: Request, res: Response) => {
       case 'invoice.payment_succeeded': {
         const invoice = event.data.object as Stripe.Invoice;
         console.log(`Payment succeeded for invoice ${invoice.id}`);
+
+        // Send payment success email
+        const customerId = invoice.customer as string;
+        const tenant = await prisma.tenant.findFirst({
+          where: { stripeCustomerId: customerId },
+          include: { users: { where: { role: 'ADMIN' }, take: 1 } },
+        });
+
+        if (tenant && tenant.users[0]) {
+          await sendPaymentSuccessEmail(tenant.users[0].email, tenant.name);
+        }
         break;
       }
 
@@ -96,16 +108,22 @@ router.post('/stripe', async (req: Request, res: Response) => {
         console.log(`Payment failed for invoice ${invoice.id}`);
 
         // Find tenant by customer ID and update status
-        const customerId = invoice.customer as string;
-        const tenant = await prisma.tenant.findFirst({
-          where: { stripeCustomerId: customerId },
+        const failedCustomerId = invoice.customer as string;
+        const failedTenant = await prisma.tenant.findFirst({
+          where: { stripeCustomerId: failedCustomerId },
+          include: { users: { where: { role: 'ADMIN' }, take: 1 } },
         });
 
-        if (tenant) {
+        if (failedTenant) {
           await prisma.tenant.update({
-            where: { id: tenant.id },
+            where: { id: failedTenant.id },
             data: { subscriptionStatus: 'PAST_DUE' },
           });
+
+          // Send payment failed email
+          if (failedTenant.users[0]) {
+            await sendPaymentFailedEmail(failedTenant.users[0].email, failedTenant.name);
+          }
         }
         break;
       }

@@ -67,6 +67,9 @@ function Login() {
         </form>
         <div className="login-hint">
           <p>
+            <Link to="/forgot-password">パスワードをお忘れですか？</Link>
+          </p>
+          <p>
             アカウントをお持ちでない場合は{' '}
             <Link to="/register">新規登録</Link>
           </p>

@@ -190,3 +190,19 @@ model Constraint {
   @@index([tenantId])
   @@map("constraints")
 }
+
+// ============================================
+// PasswordResetToken (パスワードリセットトークン)
+// ============================================
+model PasswordResetToken {
+  id        String   @id @default(uuid())
+  email     String
+  token     String   @unique
+  expiresAt DateTime @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([email])
+  @@index([token])
+  @@map("password_reset_tokens")
+}
