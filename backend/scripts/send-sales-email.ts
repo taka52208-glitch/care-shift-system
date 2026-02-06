@@ -35,10 +35,8 @@ async function sendSalesEmail(
 
   const html = `
     <div style="font-family: 'Hiragino Sans', 'Meiryo', sans-serif; max-width: 600px; margin: 0 auto; line-height: 1.8;">
-      <p style="margin-bottom: 20px;">${facilityName} 管理者様</p>
-
       <p>突然のご連絡失礼いたします。<br>
-      介護施設向けシフト管理システム「CareShift」の酒井と申します。</p>
+      介護施設向けシフト管理システム「CareShift」と申します。</p>
 
       <p>貴施設では、毎月のシフト作成にどのくらいの時間をかけていらっしゃいますか？</p>
 
@@ -84,11 +82,8 @@ async function sendSalesEmail(
 
       <div style="color: #64748b; font-size: 14px;">
         <p style="margin: 0;">
-          <strong>酒井 貴幹</strong><br>
           CareShift - 介護施設向けシフト管理システム<br>
-          Email: taka52208@gmail.com<br>
-          Tel: 080-6050-3408<br>
-          Web: ${FRONTEND_URL}
+          ${FRONTEND_URL}
         </p>
       </div>
     </div>

@@ -13,11 +13,7 @@ export const authLimiter = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => {
-    // IPアドレスとメールアドレスの組み合わせで制限
-    const email = req.body?.email || '';
-    return `${req.ip}-${email}`;
-  },
+  validate: { xForwardedForHeader: false },
 });
 
 /**

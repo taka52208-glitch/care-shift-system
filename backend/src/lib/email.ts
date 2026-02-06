@@ -1,6 +1,17 @@
 import { Resend } from 'resend';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+// Resendインスタンスは遅延初期化（APIキーがある場合のみ）
+let resend: Resend | null = null;
+
+function getResend(): Resend | null {
+  if (!process.env.RESEND_API_KEY) {
+    return null;
+  }
+  if (!resend) {
+    resend = new Resend(process.env.RESEND_API_KEY);
+  }
+  return resend;
+}
 
 const FROM_EMAIL = process.env.FROM_EMAIL || 'CareShift <noreply@careshift.jp>';
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
@@ -18,13 +29,14 @@ export async function sendWelcomeEmail(
   userName: string,
   tenantName: string
 ): Promise<EmailResult> {
-  if (!process.env.RESEND_API_KEY) {
+  const client = getResend();
+  if (!client) {
     console.log('[Email] RESEND_API_KEY not set, skipping welcome email');
     return { success: true };
   }
 
   try {
-    await resend.emails.send({
+    await client.emails.send({
       from: FROM_EMAIL,
       to: email,
       subject: '【CareShift】ご登録ありがとうございます',
@@ -63,7 +75,8 @@ export async function sendPasswordResetEmail(
   email: string,
   resetToken: string
 ): Promise<EmailResult> {
-  if (!process.env.RESEND_API_KEY) {
+  const client = getResend();
+  if (!client) {
     console.log('[Email] RESEND_API_KEY not set, skipping password reset email');
     return { success: true };
   }
@@ -71,7 +84,7 @@ export async function sendPasswordResetEmail(
   const resetUrl = `${FRONTEND_URL}/reset-password?token=${resetToken}`;
 
   try {
-    await resend.emails.send({
+    await client.emails.send({
       from: FROM_EMAIL,
       to: email,
       subject: '【CareShift】パスワードリセットのご案内',
@@ -112,13 +125,14 @@ export async function sendPaymentSuccessEmail(
   email: string,
   tenantName: string
 ): Promise<EmailResult> {
-  if (!process.env.RESEND_API_KEY) {
+  const client = getResend();
+  if (!client) {
     console.log('[Email] RESEND_API_KEY not set, skipping payment success email');
     return { success: true };
   }
 
   try {
-    await resend.emails.send({
+    await client.emails.send({
       from: FROM_EMAIL,
       to: email,
       subject: '【CareShift】有料プランへのご登録ありがとうございます',
@@ -159,13 +173,14 @@ export async function sendPaymentFailedEmail(
   email: string,
   tenantName: string
 ): Promise<EmailResult> {
-  if (!process.env.RESEND_API_KEY) {
+  const client = getResend();
+  if (!client) {
     console.log('[Email] RESEND_API_KEY not set, skipping payment failed email');
     return { success: true };
   }
 
   try {
-    await resend.emails.send({
+    await client.emails.send({
       from: FROM_EMAIL,
       to: email,
       subject: '【CareShift】お支払いに問題が発生しました',
