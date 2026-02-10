@@ -1,8 +1,9 @@
 import { Router } from 'express';
 import { prisma } from '../lib/prisma.js';
-import { authMiddleware } from '../middleware/auth.js';
+import { authMiddleware, requireRole } from '../middleware/auth.js';
 import { toShiftResponse } from '../types/index.js';
 import { generateShifts, clearShifts } from '../services/shiftGenerator.js';
+import { logger } from '../lib/logger.js';
 
 const router = Router();
 
@@ -20,7 +21,7 @@ router.get('/', authMiddleware, async (req, res) => {
 
     res.json(shifts.map(toShiftResponse));
   } catch (error) {
-    console.error('Error fetching shifts:', error);
+    logger.error('Error fetching shifts', { error: String(error) });
     res.status(500).json({ error: 'シフト一覧の取得に失敗しました' });
   }
 });
@@ -35,15 +36,23 @@ router.get('/staff/:staffId', authMiddleware, async (req, res) => {
 
     res.json(shifts.map(toShiftResponse));
   } catch (error) {
-    console.error('Error fetching staff shifts:', error);
+    logger.error('Error fetching staff shifts', { error: String(error) });
     res.status(500).json({ error: 'スタッフのシフト取得に失敗しました' });
   }
 });
 
 // POST create shift
-router.post('/', authMiddleware, async (req, res) => {
+router.post('/', authMiddleware, requireRole('ADMIN', 'MANAGER'), async (req, res) => {
   try {
     const { staffId, date, patternId } = req.body;
+
+    if (!staffId || !date || !patternId) {
+      return res.status(400).json({ error: 'スタッフID、日付、パターンIDは必須です', code: 'VALIDATION_ERROR' });
+    }
+
+    if (typeof date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      return res.status(400).json({ error: '日付の形式が正しくありません (YYYY-MM-DD)', code: 'VALIDATION_ERROR' });
+    }
 
     // Check if shift already exists for this staff on this date
     const existing = await prisma.shift.findFirst({
@@ -71,13 +80,13 @@ router.post('/', authMiddleware, async (req, res) => {
 
     res.status(201).json(toShiftResponse(shift));
   } catch (error) {
-    console.error('Error creating shift:', error);
+    logger.error('Error creating shift', { error: String(error) });
     res.status(500).json({ error: 'シフトの作成に失敗しました' });
   }
 });
 
 // PUT update shift
-router.put('/:id', authMiddleware, async (req, res) => {
+router.put('/:id', authMiddleware, requireRole('ADMIN', 'MANAGER'), async (req, res) => {
   try {
     const { patternId } = req.body;
 
@@ -97,13 +106,13 @@ router.put('/:id', authMiddleware, async (req, res) => {
 
     res.json(toShiftResponse(shift));
   } catch (error) {
-    console.error('Error updating shift:', error);
+    logger.error('Error updating shift', { error: String(error) });
     res.status(500).json({ error: 'シフトの更新に失敗しました' });
   }
 });
 
 // DELETE shift
-router.delete('/:id', authMiddleware, async (req, res) => {
+router.delete('/:id', authMiddleware, requireRole('ADMIN', 'MANAGER'), async (req, res) => {
   try {
     // Check if shift exists
     const existing = await prisma.shift.findFirst({
@@ -120,16 +129,24 @@ router.delete('/:id', authMiddleware, async (req, res) => {
 
     res.status(204).send();
   } catch (error) {
-    console.error('Error deleting shift:', error);
+    logger.error('Error deleting shift', { error: String(error) });
     res.status(500).json({ error: 'シフトの削除に失敗しました' });
   }
 });
 
 // POST bulk create/update shifts
-router.post('/bulk', authMiddleware, async (req, res) => {
+router.post('/bulk', authMiddleware, requireRole('ADMIN', 'MANAGER'), async (req, res) => {
   try {
     const { items } = req.body;
     const tenantId = req.tenantId!;
+
+    if (!items || !Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ error: 'items配列が必要です', code: 'VALIDATION_ERROR' });
+    }
+
+    if (items.length > 500) {
+      return res.status(400).json({ error: '一度に500件まで処理できます', code: 'VALIDATION_ERROR' });
+    }
 
     // Use transaction for bulk operations
     await prisma.$transaction(async (tx) => {
@@ -156,13 +173,13 @@ router.post('/bulk', authMiddleware, async (req, res) => {
 
     res.json({ success: true, count: items.length });
   } catch (error) {
-    console.error('Error bulk creating shifts:', error);
+    logger.error('Error bulk creating shifts', { error: String(error) });
     res.status(500).json({ error: 'シフトの一括作成に失敗しました' });
   }
 });
 
 // POST auto-generate shifts for a month
-router.post('/auto-generate', authMiddleware, async (req, res) => {
+router.post('/auto-generate', authMiddleware, requireRole('ADMIN', 'MANAGER'), async (req, res) => {
   try {
     const { month, clearExisting } = req.body;
     const tenantId = req.tenantId!;
@@ -195,13 +212,13 @@ router.post('/auto-generate', authMiddleware, async (req, res) => {
       });
     }
   } catch (error) {
-    console.error('Error auto-generating shifts:', error);
+    logger.error('Error auto-generating shifts', { error: String(error) });
     res.status(500).json({ error: 'シフトの自動生成に失敗しました' });
   }
 });
 
 // DELETE clear shifts for a month
-router.delete('/month/:month', authMiddleware, async (req, res) => {
+router.delete('/month/:month', authMiddleware, requireRole('ADMIN', 'MANAGER'), async (req, res) => {
   try {
     const { month } = req.params;
     const tenantId = req.tenantId!;
@@ -213,7 +230,7 @@ router.delete('/month/:month', authMiddleware, async (req, res) => {
     const deleted = await clearShifts(tenantId, month);
     res.json({ success: true, deleted });
   } catch (error) {
-    console.error('Error clearing shifts:', error);
+    logger.error('Error clearing shifts', { error: String(error) });
     res.status(500).json({ error: 'シフトの削除に失敗しました' });
   }
 });

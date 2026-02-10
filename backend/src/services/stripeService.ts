@@ -1,5 +1,6 @@
 import { stripe, PRICE_ID, TRIAL_DAYS } from '../lib/stripe.js';
 import { prisma } from '../lib/prisma.js';
+import { logger } from '../lib/logger.js';
 import { SubscriptionStatus } from '@prisma/client';
 
 function getStripe() {
@@ -111,7 +112,7 @@ export async function handleSubscriptionChange(
   }
 
   if (!tenant) {
-    console.error('Tenant not found for subscription:', subscription.id);
+    logger.error('Tenant not found for subscription', { subscriptionId: subscription.id });
     return;
   }
 
@@ -146,7 +147,7 @@ export async function handleSubscriptionChange(
     },
   });
 
-  console.log(`Updated tenant ${tenant.id} subscription status to ${status}`);
+  logger.info('Updated tenant subscription status', { tenantId: tenant.id, status });
 }
 
 /**

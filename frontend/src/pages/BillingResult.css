@@ -84,3 +84,19 @@
 .result-actions .btn-secondary:hover {
   background: #f9fafb;
 }
+
+@media (max-width: 480px) {
+  .result-card {
+    padding: 24px 16px;
+  }
+
+  .result-title {
+    font-size: 20px;
+  }
+
+  .result-icon {
+    width: 64px;
+    height: 64px;
+    font-size: 32px;
+  }
+}

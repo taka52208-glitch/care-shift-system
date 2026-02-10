@@ -179,3 +179,76 @@
   background-color: #fca5a5;
   cursor: not-allowed;
 }
+
+@media (max-width: 768px) {
+  .shift-calendar {
+    height: auto;
+    min-height: calc(100vh - var(--header-height) - 2rem);
+  }
+
+  .header-actions {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .current-month {
+    min-width: 100px;
+    font-size: 0.9375rem;
+  }
+
+  .shift-legend {
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    justify-content: flex-start;
+  }
+
+  .calendar-container {
+    overflow: visible;
+  }
+
+  .calendar-scroll {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .shift-table th,
+  .shift-table td {
+    min-width: 40px;
+    padding: 0.375rem;
+    font-size: 0.75rem;
+  }
+
+  .staff-column,
+  .staff-name {
+    min-width: 80px !important;
+    font-size: 0.75rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .shift-table th,
+  .shift-table td {
+    min-width: 32px;
+    padding: 0.25rem;
+    font-size: 0.6875rem;
+  }
+
+  .staff-column,
+  .staff-name {
+    min-width: 60px !important;
+    font-size: 0.6875rem;
+  }
+
+  .shift-slot {
+    height: 1.5rem;
+  }
+
+  .legend-item {
+    font-size: 0.75rem;
+  }
+
+  .legend-color {
+    width: 0.75rem;
+    height: 0.75rem;
+  }
+}

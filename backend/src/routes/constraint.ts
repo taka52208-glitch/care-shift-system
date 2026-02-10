@@ -1,7 +1,8 @@
 import { Router } from 'express';
 import { prisma } from '../lib/prisma.js';
-import { authMiddleware } from '../middleware/auth.js';
+import { authMiddleware, requireRole } from '../middleware/auth.js';
 import { toConstraintResponse } from '../types/index.js';
+import { logger } from '../lib/logger.js';
 
 const router = Router();
 
@@ -14,7 +15,7 @@ router.get('/', authMiddleware, async (req, res) => {
     });
     res.json(constraints.map(toConstraintResponse));
   } catch (error) {
-    console.error('Error fetching constraints:', error);
+    logger.error('Error fetching constraints', { error: String(error) });
     res.status(500).json({ error: '制約の取得に失敗しました' });
   }
 });
@@ -28,13 +29,13 @@ router.get('/category/:category', authMiddleware, async (req, res) => {
     });
     res.json(constraints.map(toConstraintResponse));
   } catch (error) {
-    console.error('Error fetching constraints by category:', error);
+    logger.error('Error fetching constraints by category', { error: String(error) });
     res.status(500).json({ error: '制約の取得に失敗しました' });
   }
 });
 
 // PUT update constraint by ID
-router.put('/:id', authMiddleware, async (req, res) => {
+router.put('/:id', authMiddleware, requireRole('ADMIN'), async (req, res) => {
   try {
     const { value } = req.body;
     const { id } = req.params;
@@ -55,13 +56,13 @@ router.put('/:id', authMiddleware, async (req, res) => {
 
     res.json(toConstraintResponse(updated));
   } catch (error) {
-    console.error('Error updating constraint:', error);
+    logger.error('Error updating constraint', { error: String(error) });
     res.status(500).json({ error: '制約の更新に失敗しました' });
   }
 });
 
 // PUT bulk update constraints (upsert)
-router.put('/', authMiddleware, async (req, res) => {
+router.put('/', authMiddleware, requireRole('ADMIN'), async (req, res) => {
   try {
     const { items } = req.body as {
       items: Array<{ id?: string; category: string; key: string; value: number | boolean | string }>;
@@ -105,7 +106,7 @@ router.put('/', authMiddleware, async (req, res) => {
 
     res.json(constraints.map(toConstraintResponse));
   } catch (error) {
-    console.error('Error bulk updating constraints:', error);
+    logger.error('Error bulk updating constraints', { error: String(error) });
     res.status(500).json({ error: '制約の一括更新に失敗しました' });
   }
 });

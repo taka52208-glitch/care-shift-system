@@ -12,12 +12,20 @@ const menuItems = [
   { path: '/app/settings', label: '設定', icon: '⚙️' },
 ]
 
-function Sidebar() {
+interface SidebarProps {
+  isOpen: boolean
+  onClose: () => void
+}
+
+function Sidebar({ isOpen, onClose }: SidebarProps) {
   return (
-    <aside className="sidebar">
+    <aside className={`sidebar ${isOpen ? 'sidebar-open' : ''}`}>
       <div className="sidebar-header">
         <span className="sidebar-logo">🏥</span>
         <span className="sidebar-brand">CareShift</span>
+        <button className="sidebar-close-btn" onClick={onClose} aria-label="メニューを閉じる">
+          &times;
+        </button>
       </div>
       <nav className="sidebar-nav">
         {menuItems.map((item) => (

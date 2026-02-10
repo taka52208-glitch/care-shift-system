@@ -1,7 +1,8 @@
 import Stripe from 'stripe';
+import { logger } from './logger.js';
 
 if (!process.env.STRIPE_SECRET_KEY) {
-  console.warn('Warning: STRIPE_SECRET_KEY not set - Stripe features disabled');
+  logger.warn('STRIPE_SECRET_KEY not set - Stripe features disabled');
 }
 
 // Stripeは設定されている場合のみ初期化

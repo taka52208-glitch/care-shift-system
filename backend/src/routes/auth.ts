@@ -2,8 +2,9 @@ import { Router, Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import { prisma } from '../lib/prisma.js';
-import { generateToken, authMiddleware } from '../middleware/auth.js';
+import { generateToken, generateRefreshToken, getRefreshTokenExpiry, setAuthCookies, clearAuthCookies, authMiddleware } from '../middleware/auth.js';
 import { sendWelcomeEmail, sendPasswordResetEmail } from '../lib/email.js';
+import { logger } from '../lib/logger.js';
 import type { RegisterRequest, LoginRequest } from '../types/index.js';
 
 const router = Router();
@@ -21,6 +22,30 @@ router.post('/register', async (req: Request, res: Response) => {
       return res.status(400).json({
         error: '全ての項目を入力してください',
         code: 'VALIDATION_ERROR',
+      });
+    }
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({
+        error: '有効なメールアドレスを入力してください',
+        code: 'INVALID_EMAIL',
+      });
+    }
+
+    // Validate password strength
+    if (password.length < 8) {
+      return res.status(400).json({
+        error: 'パスワードは8文字以上で入力してください',
+        code: 'PASSWORD_TOO_SHORT',
+      });
+    }
+
+    if (!/[A-Za-z]/.test(password) || !/[0-9]/.test(password)) {
+      return res.status(400).json({
+        error: 'パスワードには英字と数字の両方を含めてください',
+        code: 'PASSWORD_TOO_WEAK',
       });
     }
 
@@ -101,7 +126,7 @@ router.post('/register', async (req: Request, res: Response) => {
       return { tenant, user };
     });
 
-    // Generate token
+    // Generate tokens
     const token = generateToken({
       userId: result.user.id,
       tenantId: result.tenant.id,
@@ -109,8 +134,20 @@ router.post('/register', async (req: Request, res: Response) => {
       role: result.user.role,
     });
 
+    const refreshToken = generateRefreshToken();
+    await prisma.refreshToken.create({
+      data: {
+        userId: result.user.id,
+        token: refreshToken,
+        expiresAt: getRefreshTokenExpiry(),
+      },
+    });
+
+    // Set HttpOnly cookies
+    setAuthCookies(res, token, refreshToken);
+
     // Send welcome email (async, don't wait)
-    sendWelcomeEmail(email, userName, tenantName).catch(console.error);
+    sendWelcomeEmail(email, userName, tenantName).catch((err) => logger.error('Failed to send welcome email', { error: String(err) }));
 
     res.status(201).json({
       message: '登録が完了しました',
@@ -128,7 +165,7 @@ router.post('/register', async (req: Request, res: Response) => {
       },
     });
   } catch (error) {
-    console.error('Registration error:', error);
+    logger.error('Registration error', { error: String(error) });
     res.status(500).json({
       error: '登録中にエラーが発生しました',
       code: 'REGISTRATION_ERROR',
@@ -209,13 +246,25 @@ router.post('/login', async (req: Request, res: Response) => {
       });
     }
 
-    // Generate token
+    // Generate tokens
     const token = generateToken({
       userId: user.id,
       tenantId: user.tenantId,
       email: user.email,
       role: user.role,
     });
+
+    const refreshToken = generateRefreshToken();
+    await prisma.refreshToken.create({
+      data: {
+        userId: user.id,
+        token: refreshToken,
+        expiresAt: getRefreshTokenExpiry(),
+      },
+    });
+
+    // Set HttpOnly cookies
+    setAuthCookies(res, token, refreshToken);
 
     res.json({
       token,
@@ -232,7 +281,7 @@ router.post('/login', async (req: Request, res: Response) => {
       },
     });
   } catch (error) {
-    console.error('Login error:', error);
+    logger.error('Login error', { error: String(error) });
     res.status(500).json({
       error: 'ログイン中にエラーが発生しました',
       code: 'LOGIN_ERROR',
@@ -279,7 +328,7 @@ router.get('/me', authMiddleware, async (req: Request, res: Response) => {
       },
     });
   } catch (error) {
-    console.error('Get user error:', error);
+    logger.error('Get user error', { error: String(error) });
     res.status(500).json({
       error: 'ユーザー情報の取得中にエラーが発生しました',
       code: 'GET_USER_ERROR',
@@ -305,7 +354,7 @@ router.post('/check-subdomain', async (req: Request, res: Response) => {
 
     res.json({ available: !existing });
   } catch (error) {
-    console.error('Check subdomain error:', error);
+    logger.error('Check subdomain error', { error: String(error) });
     res.status(500).json({ available: false, error: 'エラーが発生しました' });
   }
 });
@@ -357,7 +406,7 @@ router.post('/forgot-password', async (req: Request, res: Response) => {
       message: 'パスワードリセットのメールを送信しました（登録されている場合）',
     });
   } catch (error) {
-    console.error('Forgot password error:', error);
+    logger.error('Forgot password error', { error: String(error) });
     res.status(500).json({
       error: 'エラーが発生しました',
       code: 'FORGOT_PASSWORD_ERROR',
@@ -380,10 +429,17 @@ router.post('/reset-password', async (req: Request, res: Response) => {
       });
     }
 
-    if (password.length < 6) {
+    if (password.length < 8) {
       return res.status(400).json({
-        error: 'パスワードは6文字以上で入力してください',
+        error: 'パスワードは8文字以上で入力してください',
         code: 'PASSWORD_TOO_SHORT',
+      });
+    }
+
+    if (!/[A-Za-z]/.test(password) || !/[0-9]/.test(password)) {
+      return res.status(400).json({
+        error: 'パスワードには英字と数字の両方を含めてください',
+        code: 'PASSWORD_TOO_WEAK',
       });
     }
 
@@ -433,11 +489,113 @@ router.post('/reset-password', async (req: Request, res: Response) => {
       message: 'パスワードが更新されました',
     });
   } catch (error) {
-    console.error('Reset password error:', error);
+    logger.error('Reset password error', { error: String(error) });
     res.status(500).json({
       error: 'エラーが発生しました',
       code: 'RESET_PASSWORD_ERROR',
     });
+  }
+});
+
+/**
+ * POST /api/auth/refresh
+ * Refresh access token using refresh token
+ */
+router.post('/refresh', async (req: Request, res: Response) => {
+  try {
+    const refreshTokenValue = req.cookies?.refresh_token;
+
+    if (!refreshTokenValue) {
+      return res.status(401).json({
+        error: 'リフレッシュトークンが必要です',
+        code: 'REFRESH_TOKEN_REQUIRED',
+      });
+    }
+
+    // Find valid refresh token
+    const storedToken = await prisma.refreshToken.findUnique({
+      where: { token: refreshTokenValue },
+      include: {
+        user: {
+          include: {
+            tenant: { select: { id: true, name: true, subdomain: true } },
+          },
+        },
+      },
+    });
+
+    if (!storedToken || storedToken.revokedAt || storedToken.expiresAt < new Date()) {
+      clearAuthCookies(res);
+      return res.status(401).json({
+        error: 'リフレッシュトークンが無効または期限切れです',
+        code: 'INVALID_REFRESH_TOKEN',
+      });
+    }
+
+    // Revoke old refresh token
+    await prisma.refreshToken.update({
+      where: { id: storedToken.id },
+      data: { revokedAt: new Date() },
+    });
+
+    // Generate new tokens
+    const newAccessToken = generateToken({
+      userId: storedToken.user.id,
+      tenantId: storedToken.user.tenantId,
+      email: storedToken.user.email,
+      role: storedToken.user.role,
+    });
+
+    const newRefreshToken = generateRefreshToken();
+    await prisma.refreshToken.create({
+      data: {
+        userId: storedToken.user.id,
+        token: newRefreshToken,
+        expiresAt: getRefreshTokenExpiry(),
+      },
+    });
+
+    setAuthCookies(res, newAccessToken, newRefreshToken);
+
+    res.json({
+      token: newAccessToken,
+      user: {
+        id: storedToken.user.id,
+        email: storedToken.user.email,
+        name: storedToken.user.name,
+        role: storedToken.user.role,
+      },
+    });
+  } catch (error) {
+    logger.error('Refresh token error', { error: String(error) });
+    res.status(500).json({
+      error: 'トークンの更新に失敗しました',
+      code: 'REFRESH_ERROR',
+    });
+  }
+});
+
+/**
+ * POST /api/auth/logout
+ * Revoke refresh token and clear cookies
+ */
+router.post('/logout', async (req: Request, res: Response) => {
+  try {
+    const refreshTokenValue = req.cookies?.refresh_token;
+
+    if (refreshTokenValue) {
+      await prisma.refreshToken.updateMany({
+        where: { token: refreshTokenValue, revokedAt: null },
+        data: { revokedAt: new Date() },
+      });
+    }
+
+    clearAuthCookies(res);
+    res.json({ message: 'ログアウトしました' });
+  } catch (error) {
+    logger.error('Logout error', { error: String(error) });
+    clearAuthCookies(res);
+    res.json({ message: 'ログアウトしました' });
   }
 });
 

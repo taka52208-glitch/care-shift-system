@@ -1,6 +1,7 @@
 import { Router, Response } from 'express';
 import { prisma } from '../lib/prisma.js';
-import { authMiddleware, AuthRequest } from '../middleware/auth.js';
+import { authMiddleware, requireRole, AuthRequest } from '../middleware/auth.js';
+import { logger } from '../lib/logger.js';
 
 const router = Router();
 
@@ -58,7 +59,7 @@ function calculateHours(startTime: string, endTime: string, breakTime: number): 
 }
 
 // GET monthly report
-router.get('/:month', async (req: AuthRequest, res: Response) => {
+router.get('/:month', requireRole('ADMIN', 'MANAGER'), async (req: AuthRequest, res: Response) => {
   try {
     const { month } = req.params;
     const tenantId = req.tenantId!;
@@ -181,13 +182,13 @@ router.get('/:month', async (req: AuthRequest, res: Response) => {
 
     res.json(report);
   } catch (error) {
-    console.error('Monthly report error:', error);
+    logger.error('Monthly report error', { error: String(error) });
     res.status(500).json({ error: '月次レポートの取得に失敗しました' });
   }
 });
 
 // GET staff report for a specific month
-router.get('/:month/staff/:staffId', async (req: AuthRequest, res: Response) => {
+router.get('/:month/staff/:staffId', requireRole('ADMIN', 'MANAGER'), async (req: AuthRequest, res: Response) => {
   try {
     const { month, staffId } = req.params;
     const tenantId = req.tenantId!;
@@ -245,7 +246,7 @@ router.get('/:month/staff/:staffId', async (req: AuthRequest, res: Response) => 
       shifts: shiftDetails
     });
   } catch (error) {
-    console.error('Staff report error:', error);
+    logger.error('Staff report error', { error: String(error) });
     res.status(500).json({ error: 'スタッフレポートの取得に失敗しました' });
   }
 });

@@ -1,6 +1,7 @@
 import { Router, Response } from 'express';
 import { prisma } from '../lib/prisma.js';
 import { authMiddleware, AuthRequest } from '../middleware/auth.js';
+import { logger } from '../lib/logger.js';
 
 const router = Router();
 
@@ -81,7 +82,7 @@ router.get('/stats', async (req: AuthRequest, res: Response) => {
       shiftsByPattern
     });
   } catch (error) {
-    console.error('Dashboard stats error:', error);
+    logger.error('Dashboard stats error', { error: String(error) });
     res.status(500).json({ error: 'ダッシュボード統計の取得に失敗しました' });
   }
 });
@@ -143,7 +144,7 @@ router.get('/weekly', async (req: AuthRequest, res: Response) => {
 
     res.json(weeklyData);
   } catch (error) {
-    console.error('Weekly shifts error:', error);
+    logger.error('Weekly shifts error', { error: String(error) });
     res.status(500).json({ error: '週間シフトの取得に失敗しました' });
   }
 });
@@ -173,7 +174,7 @@ router.get('/activity', async (req: AuthRequest, res: Response) => {
 
     res.json(activity);
   } catch (error) {
-    console.error('Activity error:', error);
+    logger.error('Activity error', { error: String(error) });
     res.status(500).json({ error: 'アクティビティの取得に失敗しました' });
   }
 });

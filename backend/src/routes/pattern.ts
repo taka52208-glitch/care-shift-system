@@ -1,7 +1,8 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../lib/prisma.js';
-import { authMiddleware } from '../middleware/auth.js';
+import { authMiddleware, requireRole } from '../middleware/auth.js';
 import { toShiftPatternResponse } from '../types/index.js';
+import { logger } from '../lib/logger.js';
 
 const router = Router();
 
@@ -17,7 +18,7 @@ router.get('/', async (req: Request, res: Response) => {
     });
     res.json(patterns.map(toShiftPatternResponse));
   } catch (error) {
-    console.error('Get patterns error:', error);
+    logger.error('Get patterns error', { error: String(error) });
     res.status(500).json({
       error: 'シフトパターンの取得中にエラーが発生しました',
       code: 'GET_PATTERNS_ERROR',
@@ -41,7 +42,7 @@ router.get('/:id', async (req: Request, res: Response) => {
 
     res.json(toShiftPatternResponse(pattern));
   } catch (error) {
-    console.error('Get pattern error:', error);
+    logger.error('Get pattern error', { error: String(error) });
     res.status(500).json({
       error: 'シフトパターンの取得中にエラーが発生しました',
       code: 'GET_PATTERN_ERROR',
@@ -50,7 +51,7 @@ router.get('/:id', async (req: Request, res: Response) => {
 });
 
 // POST create pattern
-router.post('/', async (req: Request, res: Response) => {
+router.post('/', requireRole('ADMIN'), async (req: Request, res: Response) => {
   try {
     const { name, code, startTime, endTime, breakTime, color } = req.body;
 
@@ -58,6 +59,42 @@ router.post('/', async (req: Request, res: Response) => {
     if (!name || !code || !startTime || !endTime) {
       return res.status(400).json({
         error: '名前、コード、開始時間、終了時間は必須です',
+        code: 'VALIDATION_ERROR',
+      });
+    }
+
+    if (typeof name !== 'string' || name.length > 50) {
+      return res.status(400).json({
+        error: 'パターン名は50文字以内で入力してください',
+        code: 'VALIDATION_ERROR',
+      });
+    }
+
+    if (typeof code !== 'string' || code.length > 5) {
+      return res.status(400).json({
+        error: 'コードは5文字以内で入力してください',
+        code: 'VALIDATION_ERROR',
+      });
+    }
+
+    const timeRegex = /^(\d{2}:\d{2}|-)$/;
+    if (!timeRegex.test(startTime) || !timeRegex.test(endTime)) {
+      return res.status(400).json({
+        error: '時間の形式が正しくありません (HH:MM)',
+        code: 'VALIDATION_ERROR',
+      });
+    }
+
+    if (breakTime !== undefined && (typeof breakTime !== 'number' || breakTime < 0 || breakTime > 480)) {
+      return res.status(400).json({
+        error: '休憩時間は0〜480分の範囲で入力してください',
+        code: 'VALIDATION_ERROR',
+      });
+    }
+
+    if (color && (typeof color !== 'string' || color.length > 20)) {
+      return res.status(400).json({
+        error: 'カラーの形式が正しくありません',
         code: 'VALIDATION_ERROR',
       });
     }
@@ -77,8 +114,8 @@ router.post('/', async (req: Request, res: Response) => {
     const pattern = await prisma.shiftPattern.create({
       data: {
         tenantId: req.tenantId!,
-        name,
-        code,
+        name: name.trim(),
+        code: code.trim(),
         startTime,
         endTime,
         breakTime: breakTime || 0,
@@ -88,7 +125,7 @@ router.post('/', async (req: Request, res: Response) => {
 
     res.status(201).json(toShiftPatternResponse(pattern));
   } catch (error) {
-    console.error('Create pattern error:', error);
+    logger.error('Create pattern error', { error: String(error) });
     res.status(500).json({
       error: 'シフトパターンの作成中にエラーが発生しました',
       code: 'CREATE_PATTERN_ERROR',
@@ -97,9 +134,23 @@ router.post('/', async (req: Request, res: Response) => {
 });
 
 // PUT update pattern
-router.put('/:id', async (req: Request, res: Response) => {
+router.put('/:id', requireRole('ADMIN'), async (req: Request, res: Response) => {
   try {
     const { name, code, startTime, endTime, breakTime, color } = req.body;
+
+    if (name !== undefined && (typeof name !== 'string' || name.length > 50)) {
+      return res.status(400).json({
+        error: 'パターン名は50文字以内で入力してください',
+        code: 'VALIDATION_ERROR',
+      });
+    }
+
+    if (code !== undefined && (typeof code !== 'string' || code.length > 5)) {
+      return res.status(400).json({
+        error: 'コードは5文字以内で入力してください',
+        code: 'VALIDATION_ERROR',
+      });
+    }
 
     // Check if pattern exists and belongs to tenant
     const existingPattern = await prisma.shiftPattern.findFirst({
@@ -141,7 +192,7 @@ router.put('/:id', async (req: Request, res: Response) => {
 
     res.json(toShiftPatternResponse(pattern));
   } catch (error) {
-    console.error('Update pattern error:', error);
+    logger.error('Update pattern error', { error: String(error) });
     res.status(500).json({
       error: 'シフトパターンの更新中にエラーが発生しました',
       code: 'UPDATE_PATTERN_ERROR',
@@ -150,7 +201,7 @@ router.put('/:id', async (req: Request, res: Response) => {
 });
 
 // DELETE pattern
-router.delete('/:id', async (req: Request, res: Response) => {
+router.delete('/:id', requireRole('ADMIN'), async (req: Request, res: Response) => {
   try {
     // Check if pattern exists and belongs to tenant
     const existingPattern = await prisma.shiftPattern.findFirst({
@@ -185,7 +236,7 @@ router.delete('/:id', async (req: Request, res: Response) => {
 
     res.status(204).send();
   } catch (error) {
-    console.error('Delete pattern error:', error);
+    logger.error('Delete pattern error', { error: String(error) });
     res.status(500).json({
       error: 'シフトパターンの削除中にエラーが発生しました',
       code: 'DELETE_PATTERN_ERROR',

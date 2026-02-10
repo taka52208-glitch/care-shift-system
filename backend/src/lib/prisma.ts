@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client';
+import { logger } from './logger.js';
 
 // Singleton pattern for Prisma Client
 const globalForPrisma = globalThis as unknown as {
@@ -14,6 +15,8 @@ export const prisma =
 if (process.env.NODE_ENV !== 'production') {
   globalForPrisma.prisma = prisma;
 }
+
+logger.info('Prisma client initialized', { env: process.env.NODE_ENV || 'development' });
 
 /**
  * Simple tenant-scoped client wrapper

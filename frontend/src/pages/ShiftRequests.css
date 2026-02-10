@@ -65,3 +65,36 @@
 .btn-success:hover {
   background-color: #16a34a;
 }
+
+/* テーブル横スクロール */
+.table-responsive {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+@media (max-width: 768px) {
+  .filter-bar {
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .filter-select,
+  .filter-month {
+    width: 100%;
+  }
+
+  .requests-table {
+    min-width: 600px;
+  }
+
+  .action-buttons {
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .filter-bar {
+    padding: 0.75rem;
+  }
+}

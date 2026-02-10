@@ -58,7 +58,8 @@ model User {
   updatedAt    DateTime @updatedAt @map("updated_at")
 
   // Relations
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant        Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  refreshTokens RefreshToken[]
 
   @@unique([tenantId, email]) // テナント内でメール一意
   @@index([tenantId])
@@ -189,6 +190,36 @@ model Constraint {
   @@unique([tenantId, category, key]) // テナント内でカテゴリ+キー一意
   @@index([tenantId])
   @@map("constraints")
+}
+
+// ============================================
+// ProcessedWebhookEvent (処理済みWebhookイベント)
+// ============================================
+model ProcessedWebhookEvent {
+  id          String   @id
+  eventType   String   @map("event_type")
+  processedAt DateTime @default(now()) @map("processed_at")
+
+  @@index([id])
+  @@map("processed_webhook_events")
+}
+
+// ============================================
+// RefreshToken (リフレッシュトークン)
+// ============================================
+model RefreshToken {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  token     String   @unique
+  expiresAt DateTime @map("expires_at")
+  revokedAt DateTime? @map("revoked_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([token])
+  @@map("refresh_tokens")
 }
 
 // ============================================

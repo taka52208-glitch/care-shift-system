@@ -4,6 +4,7 @@ import { stripe } from '../lib/stripe.js';
 import { handleSubscriptionChange } from '../services/stripeService.js';
 import { prisma } from '../lib/prisma.js';
 import { sendPaymentSuccessEmail, sendPaymentFailedEmail } from '../lib/email.js';
+import { logger } from '../lib/logger.js';
 
 const router = Router();
 
@@ -18,12 +19,12 @@ router.post('/stripe', async (req: Request, res: Response) => {
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
   if (!webhookSecret) {
-    console.error('STRIPE_WEBHOOK_SECRET not configured');
+    logger.error('STRIPE_WEBHOOK_SECRET not configured');
     return res.status(500).json({ error: 'Webhook not configured' });
   }
 
   if (!stripe) {
-    console.error('Stripe not configured');
+    logger.error('Stripe not configured');
     return res.status(500).json({ error: 'Stripe not configured' });
   }
 
@@ -37,11 +38,21 @@ router.post('/stripe', async (req: Request, res: Response) => {
       webhookSecret
     );
   } catch (err) {
-    console.error('Webhook signature verification failed:', err);
+    logger.error('Webhook signature verification failed', { error: String(err) });
     return res.status(400).json({ error: 'Webhook signature verification failed' });
   }
 
-  console.log(`Received Stripe event: ${event.type}`);
+  // Idempotency check: skip already processed events
+  const existing = await prisma.processedWebhookEvent.findUnique({
+    where: { id: event.id },
+  });
+
+  if (existing) {
+    logger.info('Skipping already processed event', { eventId: event.id });
+    return res.json({ received: true, duplicate: true });
+  }
+
+  logger.info('Received Stripe event', { eventType: event.type, eventId: event.id });
 
   try {
     switch (event.type) {
@@ -58,7 +69,6 @@ router.post('/stripe', async (req: Request, res: Response) => {
         // Update trial dates
         const tenantId = subscription.metadata.tenantId;
         if (tenantId) {
-          // Get period end from the first subscription item
           const periodEnd = subscription.items.data[0]?.current_period_end;
           await prisma.tenant.update({
             where: { id: tenantId },
@@ -88,9 +98,8 @@ router.post('/stripe', async (req: Request, res: Response) => {
 
       case 'invoice.payment_succeeded': {
         const invoice = event.data.object as Stripe.Invoice;
-        console.log(`Payment succeeded for invoice ${invoice.id}`);
+        logger.info('Payment succeeded', { invoiceId: invoice.id });
 
-        // Send payment success email
         const customerId = invoice.customer as string;
         const tenant = await prisma.tenant.findFirst({
           where: { stripeCustomerId: customerId },
@@ -98,16 +107,15 @@ router.post('/stripe', async (req: Request, res: Response) => {
         });
 
         if (tenant && tenant.users[0]) {
-          await sendPaymentSuccessEmail(tenant.users[0].email, tenant.name);
+          sendPaymentSuccessEmail(tenant.users[0].email, tenant.name).catch((err) => logger.error('Failed to send payment success email', { error: String(err) }));
         }
         break;
       }
 
       case 'invoice.payment_failed': {
         const invoice = event.data.object as Stripe.Invoice;
-        console.log(`Payment failed for invoice ${invoice.id}`);
+        logger.info('Payment failed', { invoiceId: invoice.id });
 
-        // Find tenant by customer ID and update status
         const failedCustomerId = invoice.customer as string;
         const failedTenant = await prisma.tenant.findFirst({
           where: { stripeCustomerId: failedCustomerId },
@@ -120,9 +128,8 @@ router.post('/stripe', async (req: Request, res: Response) => {
             data: { subscriptionStatus: 'PAST_DUE' },
           });
 
-          // Send payment failed email
           if (failedTenant.users[0]) {
-            await sendPaymentFailedEmail(failedTenant.users[0].email, failedTenant.name);
+            sendPaymentFailedEmail(failedTenant.users[0].email, failedTenant.name).catch((err) => logger.error('Failed to send payment failed email', { error: String(err) }));
           }
         }
         break;
@@ -130,20 +137,25 @@ router.post('/stripe', async (req: Request, res: Response) => {
 
       case 'checkout.session.completed': {
         const session = event.data.object as Stripe.Checkout.Session;
-        console.log(`Checkout completed for session ${session.id}`);
-
-        // The subscription will be handled by subscription.created event
+        logger.info('Checkout completed', { sessionId: session.id });
         break;
       }
 
       default:
-        console.log(`Unhandled event type: ${event.type}`);
+        logger.warn('Unhandled event type', { eventType: event.type });
     }
+
+    // Mark event as processed
+    await prisma.processedWebhookEvent.create({
+      data: { id: event.id, eventType: event.type },
+    });
 
     res.json({ received: true });
   } catch (error) {
-    console.error('Error processing webhook:', error);
-    res.status(500).json({ error: 'Webhook processing failed' });
+    logger.error('Error processing webhook', { error: String(error) });
+    // Return 200 to prevent Stripe from retrying on application errors
+    // The event was not marked as processed, so it can be retried manually
+    res.status(200).json({ received: true, error: 'Processing failed, will retry' });
   }
 });
 

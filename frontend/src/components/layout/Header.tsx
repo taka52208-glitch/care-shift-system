@@ -2,7 +2,11 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import './Header.css'
 
-function Header() {
+interface HeaderProps {
+  onMenuToggle: () => void
+}
+
+function Header({ onMenuToggle }: HeaderProps) {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
 
@@ -14,6 +18,11 @@ function Header() {
   return (
     <header className="header">
       <div className="header-left">
+        <button className="hamburger-btn" onClick={onMenuToggle} aria-label="メニュー">
+          <span className="hamburger-line"></span>
+          <span className="hamburger-line"></span>
+          <span className="hamburger-line"></span>
+        </button>
         <h1 className="header-title">CareShift</h1>
       </div>
       <div className="header-right">

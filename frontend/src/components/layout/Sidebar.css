@@ -1,5 +1,5 @@
 .sidebar {
-  width: var(--sidebar-width);
+  width: 250px;
   height: 100vh;
   background-color: var(--surface-color);
   border-right: 1px solid var(--border-color);
@@ -8,6 +8,8 @@
   top: 0;
   display: flex;
   flex-direction: column;
+  z-index: 200;
+  transition: transform 0.3s ease;
 }
 
 .sidebar-header {
@@ -26,6 +28,25 @@
 .sidebar-brand {
   font-weight: 600;
   font-size: 1.125rem;
+  color: var(--text-primary);
+}
+
+/* 閉じるボタン（デスクトップでは非表示） */
+.sidebar-close-btn {
+  display: none;
+  margin-left: auto;
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.25rem;
+  line-height: 1;
+}
+
+.sidebar-close-btn:hover {
+  background-color: var(--background-color);
   color: var(--text-primary);
 }
 
@@ -65,4 +86,21 @@
 
 .nav-label {
   font-size: 0.9375rem;
+}
+
+/* モバイルサイドバー (768px以下) */
+@media (max-width: 768px) {
+  .sidebar {
+    transform: translateX(-100%);
+    box-shadow: none;
+  }
+
+  .sidebar.sidebar-open {
+    transform: translateX(0);
+    box-shadow: 4px 0 20px rgba(0, 0, 0, 0.15);
+  }
+
+  .sidebar-close-btn {
+    display: block;
+  }
 }

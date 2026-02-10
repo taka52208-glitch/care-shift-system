@@ -1,13 +1,61 @@
 const API_BASE = import.meta.env.DEV ? 'http://localhost:3001/api' : 'https://care-shift-system.onrender.com/api';
 
+export { API_BASE };
+
 async function request<T>(endpoint: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${API_BASE}${endpoint}`, {
     headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
     ...options,
   });
+
+  if (res.status === 401) {
+    // Try to refresh the token
+    const refreshed = await tryRefreshToken();
+    if (refreshed) {
+      // Retry original request
+      const retryRes = await fetch(`${API_BASE}${endpoint}`, {
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        ...options,
+      });
+      if (!retryRes.ok) throw new Error(`API Error: ${retryRes.status}`);
+      if (retryRes.status === 204) return {} as T;
+      return retryRes.json();
+    }
+    throw new Error('API Error: 401');
+  }
+
   if (!res.ok) throw new Error(`API Error: ${res.status}`);
   if (res.status === 204) return {} as T;
   return res.json();
+}
+
+let isRefreshing = false;
+let refreshPromise: Promise<boolean> | null = null;
+
+async function tryRefreshToken(): Promise<boolean> {
+  if (isRefreshing && refreshPromise) {
+    return refreshPromise;
+  }
+
+  isRefreshing = true;
+  refreshPromise = (async () => {
+    try {
+      const res = await fetch(`${API_BASE}/auth/refresh`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+      return res.ok;
+    } catch {
+      return false;
+    } finally {
+      isRefreshing = false;
+      refreshPromise = null;
+    }
+  })();
+
+  return refreshPromise;
 }
 
 // Staff API
@@ -57,7 +105,7 @@ export const patternApi = {
 // Constraint API
 export const constraintApi = {
   getAll: () => request<Constraint[]>('/constraints'),
-  update: (items: { id: string; value: number | boolean }[]) =>
+  update: (items: { category: string; key: string; value: number | boolean | string }[]) =>
     request<Constraint[]>('/constraints', { method: 'PUT', body: JSON.stringify({ items }) }),
 };
 

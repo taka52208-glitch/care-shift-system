@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { useAuth } from './AuthContext';
+import { API_BASE } from '../utils/api';
 
 interface BillingStatus {
   status: 'TRIALING' | 'ACTIVE' | 'CANCELED' | 'PAST_DUE' | 'UNPAID' | 'NONE';
@@ -20,23 +21,21 @@ interface BillingContextType {
 
 const BillingContext = createContext<BillingContextType | null>(null);
 
-const API_BASE = import.meta.env.DEV ? 'http://localhost:3001/api' : 'https://care-shift-system.onrender.com/api';
-
 export function BillingProvider({ children }: { children: ReactNode }) {
-  const { token } = useAuth();
+  const { user } = useAuth();
   const [billingStatus, setBillingStatus] = useState<BillingStatus | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const refreshBillingStatus = useCallback(async () => {
-    if (!token) return;
+    if (!user) return;
 
     setIsLoading(true);
     setError(null);
 
     try {
       const res = await fetch(`${API_BASE}/billing/status`, {
-        headers: { Authorization: `Bearer ${token}` }
+        credentials: 'include',
       });
 
       if (res.ok) {
@@ -51,23 +50,21 @@ export function BillingProvider({ children }: { children: ReactNode }) {
     } finally {
       setIsLoading(false);
     }
-  }, [token]);
+  }, [user]);
 
   useEffect(() => {
-    if (token) {
+    if (user) {
       refreshBillingStatus();
     }
-  }, [token, refreshBillingStatus]);
+  }, [user, refreshBillingStatus]);
 
   const createCheckoutSession = async (): Promise<string> => {
-    if (!token) throw new Error('認証が必要です');
+    if (!user) throw new Error('認証が必要です');
 
     const res = await fetch(`${API_BASE}/billing/checkout`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`
-      },
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
       body: JSON.stringify({})
     });
 
@@ -81,14 +78,12 @@ export function BillingProvider({ children }: { children: ReactNode }) {
   };
 
   const createPortalSession = async (): Promise<string> => {
-    if (!token) throw new Error('認証が必要です');
+    if (!user) throw new Error('認証が必要です');
 
     const res = await fetch(`${API_BASE}/billing/portal`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`
-      },
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
       body: JSON.stringify({})
     });
 

@@ -1,11 +1,12 @@
 import { Router } from 'express';
-import { authMiddleware } from '../middleware/auth.js';
+import { authMiddleware, requireRole } from '../middleware/auth.js';
 import { prisma } from '../lib/prisma.js';
 import {
   createCheckoutSession,
   createPortalSession,
   createStripeCustomer,
 } from '../services/stripeService.js';
+import { logger } from '../lib/logger.js';
 
 const router = Router();
 
@@ -13,7 +14,7 @@ const router = Router();
  * POST /api/billing/checkout
  * Create a Stripe Checkout session for subscription
  */
-router.post('/checkout', authMiddleware, async (req, res) => {
+router.post('/checkout', authMiddleware, requireRole('ADMIN'), async (req, res) => {
   try {
     const { successUrl, cancelUrl } = req.body;
     const tenantId = req.tenantId!;
@@ -49,7 +50,7 @@ router.post('/checkout', authMiddleware, async (req, res) => {
 
     res.json({ url: checkoutUrl });
   } catch (error) {
-    console.error('Error creating checkout session:', error);
+    logger.error('Error creating checkout session', { error: String(error) });
     res.status(500).json({ error: 'チェックアウトセッションの作成に失敗しました' });
   }
 });
@@ -58,7 +59,7 @@ router.post('/checkout', authMiddleware, async (req, res) => {
  * POST /api/billing/portal
  * Create a Stripe Customer Portal session
  */
-router.post('/portal', authMiddleware, async (req, res) => {
+router.post('/portal', authMiddleware, requireRole('ADMIN'), async (req, res) => {
   try {
     const { returnUrl } = req.body;
     const tenantId = req.tenantId!;
@@ -84,7 +85,7 @@ router.post('/portal', authMiddleware, async (req, res) => {
 
     res.json({ url: portalUrl });
   } catch (error) {
-    console.error('Error creating portal session:', error);
+    logger.error('Error creating portal session', { error: String(error) });
     res.status(500).json({ error: 'ポータルセッションの作成に失敗しました' });
   }
 });
@@ -93,7 +94,7 @@ router.post('/portal', authMiddleware, async (req, res) => {
  * GET /api/billing/status
  * Get current subscription status
  */
-router.get('/status', authMiddleware, async (req, res) => {
+router.get('/status', authMiddleware, requireRole('ADMIN'), async (req, res) => {
   try {
     const tenantId = req.tenantId!;
 
@@ -127,7 +128,7 @@ router.get('/status', authMiddleware, async (req, res) => {
       trialDaysRemaining,
     });
   } catch (error) {
-    console.error('Error fetching billing status:', error);
+    logger.error('Error fetching billing status', { error: String(error) });
     res.status(500).json({ error: '課金状態の取得に失敗しました' });
   }
 });

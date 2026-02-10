@@ -69,8 +69,59 @@
   height: 1rem;
 }
 
+.constraint-message {
+  padding: 0.75rem 1rem;
+  border-radius: 0.375rem;
+  margin-bottom: 1rem;
+  font-size: 0.875rem;
+}
+
+.constraint-message.success {
+  background-color: #f0fdf4;
+  color: #166534;
+}
+
+.constraint-message.error {
+  background-color: #fef2f2;
+  color: var(--danger-color);
+}
+
 .save-section {
   margin-top: 1.5rem;
   display: flex;
   justify-content: flex-end;
+}
+
+@media (max-width: 768px) {
+  .constraints-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .form-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+
+  .input-group {
+    width: 100%;
+  }
+
+  .constraint-section {
+    padding: 1rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .section-title {
+    font-size: 0.9375rem;
+  }
+
+  .save-section {
+    justify-content: stretch;
+  }
+
+  .save-section .btn {
+    width: 100%;
+  }
 }

@@ -106,3 +106,18 @@
 .login-hint p {
   margin: 0.25rem 0;
 }
+
+@media (max-width: 480px) {
+  .login-card {
+    padding: 1.5rem;
+    border-radius: 0.75rem;
+  }
+
+  .login-header h1 {
+    font-size: 1.25rem;
+  }
+
+  .login-logo {
+    font-size: 2.5rem;
+  }
+}

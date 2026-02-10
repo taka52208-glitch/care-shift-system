@@ -3,8 +3,8 @@
 ## 1. 基本情報
 
 - **プロジェクト名**: CareShift（介護シフト作成システム）
-- **ステータス**: 販売開始
-- **完了タスク数**: 25/25
+- **ステータス**: 商用品質達成・販売中
+- **完了タスク数**: 35/35
 - **進捗率**: 100%
 - **次のマイルストーン**: 初顧客獲得
 - **最終更新日**: 2026-02-10
@@ -44,6 +44,20 @@
 - [x] Google Search Console登録
 - [x] 利用規約・プライバシーポリシー・特商法表記
 - [x] 販売準備完了
+- [x] シフトパターン追加・編集モーダル実装
+- [x] 制約条件API連携（バックエンド保存）
+- [x] セキュリティ強化（JWT_SECRET必須化、パスワード強度検証）
+- [x] 全APIエンドポイント入力バリデーション
+- [x] HttpOnly Cookie認証 + CSRF対策（SameSite=Lax）
+- [x] リフレッシュトークン（15分アクセス+7日リフレッシュ+ローテーション）
+- [x] ロール権限制御（ADMIN/MANAGER/STAFF全ルート適用）
+- [x] Stripe Webhook冪等性（重複処理防止）
+- [x] Winston構造化ログ（console.log完全排除）
+- [x] APIテスト導入（vitest + supertest、17テストケース）
+- [x] CI/CD構築（GitHub Actions: TypeScript検証+テスト+ビルド）
+- [x] モバイルレスポンシブ対応（768px/480px、ハンバーガーメニュー）
+- [x] Prisma migrate deploy（本番安全なマイグレーション）
+- [x] BillingContext Cookie認証対応
 
 ## 4. 機能実装状況
 
@@ -62,6 +76,7 @@
 | 事業所登録 | 完了 |
 | Stripe課金 | 完了 |
 | ランディングページ | 完了 |
+| モバイルレスポンシブ | 完了 |
 
 ---
 
@@ -160,6 +175,28 @@
 - [x] SEO対策完了
 - [x] Google Search Console登録
 - [x] 法的ページ（利用規約・プライバシー・特商法）
+
+#### Phase 6: 商用品質強化 ✅ 完了
+
+| タスク | 開始 | 完了 | 備考 |
+|--------|:----:|:----:|------|
+| シフトパターン追加・編集モーダル | [x] | [x] | StaffManagementパターンに統一 |
+| 制約条件バックエンド連携 | [x] | [x] | API保存・読込実装 |
+| JWT_SECRET必須化 | [x] | [x] | デフォルト値削除、環境変数必須 |
+| パスワード強度検証 | [x] | [x] | 8文字以上、英字+数字必須 |
+| 全API入力バリデーション | [x] | [x] | staff/shift/pattern/constraint/request |
+| HttpOnly Cookie認証 | [x] | [x] | XSS対策、SameSite=Lax |
+| リフレッシュトークン | [x] | [x] | 15分アクセス+7日リフレッシュ+ローテーション |
+| ロール権限制御(RBAC) | [x] | [x] | ADMIN/MANAGER/STAFF、全ルート適用 |
+| Webhook冪等性 | [x] | [x] | ProcessedWebhookEventテーブル |
+| prisma migrate deploy | [x] | [x] | 本番安全なマイグレーション |
+| レート制限プロキシ対応 | [x] | [x] | X-Forwarded-For有効化 |
+| Winston構造化ログ | [x] | [x] | console.log/error完全排除（16ファイル） |
+| APIテスト(vitest) | [x] | [x] | 17テストケース、supertest |
+| CI/CD(GitHub Actions) | [x] | [x] | backend: tsc+test / frontend: tsc+build |
+| モバイルレスポンシブ | [x] | [x] | 768px/480px、ハンバーガーメニュー |
+| BillingContext Cookie対応 | [x] | [x] | token依存排除 |
+| Express app分離 | [x] | [x] | テスタビリティ向上 |
 
 ---
 
@@ -330,8 +367,12 @@ cd frontend && npm run dev
 | フロントエンド | React 18, TypeScript, Vite |
 | バックエンド | Express, TypeScript, Prisma |
 | データベース | PostgreSQL |
-| 認証 | JWT + bcrypt |
-| 課金 | Stripe (Checkout + Portal + Webhook) |
+| 認証 | JWT (HttpOnly Cookie) + bcrypt + リフレッシュトークン |
+| 認可 | RBAC (ADMIN/MANAGER/STAFF) |
+| 課金 | Stripe (Checkout + Portal + Webhook + 冪等性) |
+| ログ | Winston (構造化JSON) |
+| テスト | Vitest + Supertest (17テスト) |
+| CI/CD | GitHub Actions |
 | デプロイ | Vercel (FE) + Render (BE) |
 
 ---

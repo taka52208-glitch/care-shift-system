@@ -109,3 +109,43 @@
   text-align: center;
   color: #dc2626;
 }
+
+/* テーブル横スクロール */
+.table-responsive {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+@media (max-width: 768px) {
+  .summary-cards {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .header-actions {
+    flex-wrap: wrap;
+  }
+
+  .hours-table,
+  .detail-table {
+    min-width: 500px;
+  }
+
+  .distribution-item {
+    gap: 0.5rem;
+  }
+
+  .distribution-label {
+    min-width: 80px;
+    font-size: 0.75rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .summary-cards {
+    grid-template-columns: 1fr;
+  }
+
+  .summary-value {
+    font-size: 1.375rem;
+  }
+}

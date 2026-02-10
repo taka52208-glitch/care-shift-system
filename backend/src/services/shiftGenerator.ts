@@ -1,4 +1,5 @@
 import { prisma } from '../lib/prisma.js';
+import { logger } from '../lib/logger.js';
 import { v4 as uuidv4 } from 'uuid';
 import type { Staff, ShiftPattern, Constraint, ShiftRequest, Shift } from '@prisma/client';
 
@@ -366,7 +367,7 @@ export async function generateShifts(tenantId: string, month: string): Promise<G
       errors,
     };
   } catch (error) {
-    console.error('Shift generation error:', error);
+    logger.error('Shift generation error', { error: String(error) });
     errors.push(`シフト生成エラー: ${error}`);
     return { success: false, shiftsGenerated: 0, warnings, errors };
   }

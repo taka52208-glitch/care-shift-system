@@ -1,4 +1,5 @@
 import { Resend } from 'resend';
+import { logger } from './logger.js';
 
 // Resendインスタンスは遅延初期化（APIキーがある場合のみ）
 let resend: Resend | null = null;
@@ -31,7 +32,7 @@ export async function sendWelcomeEmail(
 ): Promise<EmailResult> {
   const client = getResend();
   if (!client) {
-    console.log('[Email] RESEND_API_KEY not set, skipping welcome email');
+    logger.info('RESEND_API_KEY not set, skipping welcome email');
     return { success: true };
   }
 
@@ -60,10 +61,10 @@ export async function sendWelcomeEmail(
         </div>
       `,
     });
-    console.log(`[Email] Welcome email sent to ${email}`);
+    logger.info('Welcome email sent', { to: email });
     return { success: true };
   } catch (error) {
-    console.error('[Email] Failed to send welcome email:', error);
+    logger.error('Failed to send welcome email', { error: String(error) });
     return { success: false, error: String(error) };
   }
 }
@@ -77,7 +78,7 @@ export async function sendPasswordResetEmail(
 ): Promise<EmailResult> {
   const client = getResend();
   if (!client) {
-    console.log('[Email] RESEND_API_KEY not set, skipping password reset email');
+    logger.info('RESEND_API_KEY not set, skipping password reset email');
     return { success: true };
   }
 
@@ -110,10 +111,10 @@ export async function sendPasswordResetEmail(
         </div>
       `,
     });
-    console.log(`[Email] Password reset email sent to ${email}`);
+    logger.info('Password reset email sent', { to: email });
     return { success: true };
   } catch (error) {
-    console.error('[Email] Failed to send password reset email:', error);
+    logger.error('Failed to send password reset email', { error: String(error) });
     return { success: false, error: String(error) };
   }
 }
@@ -127,7 +128,7 @@ export async function sendPaymentSuccessEmail(
 ): Promise<EmailResult> {
   const client = getResend();
   if (!client) {
-    console.log('[Email] RESEND_API_KEY not set, skipping payment success email');
+    logger.info('RESEND_API_KEY not set, skipping payment success email');
     return { success: true };
   }
 
@@ -158,10 +159,10 @@ export async function sendPaymentSuccessEmail(
         </div>
       `,
     });
-    console.log(`[Email] Payment success email sent to ${email}`);
+    logger.info('Payment success email sent', { to: email });
     return { success: true };
   } catch (error) {
-    console.error('[Email] Failed to send payment success email:', error);
+    logger.error('Failed to send payment success email', { error: String(error) });
     return { success: false, error: String(error) };
   }
 }
@@ -175,7 +176,7 @@ export async function sendPaymentFailedEmail(
 ): Promise<EmailResult> {
   const client = getResend();
   if (!client) {
-    console.log('[Email] RESEND_API_KEY not set, skipping payment failed email');
+    logger.info('RESEND_API_KEY not set, skipping payment failed email');
     return { success: true };
   }
 
@@ -205,10 +206,10 @@ export async function sendPaymentFailedEmail(
         </div>
       `,
     });
-    console.log(`[Email] Payment failed email sent to ${email}`);
+    logger.info('Payment failed email sent', { to: email });
     return { success: true };
   } catch (error) {
-    console.error('[Email] Failed to send payment failed email:', error);
+    logger.error('Failed to send payment failed email', { error: String(error) });
     return { success: false, error: String(error) };
   }
 }

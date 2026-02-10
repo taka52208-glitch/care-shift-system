@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { prisma, getTenantClient, TenantClient } from '../lib/prisma.js';
+import { logger } from '../lib/logger.js';
 
 // Extend Express Request type
 declare global {
@@ -75,7 +76,7 @@ export const tenantResolver = async (
 
     next();
   } catch (error) {
-    console.error('Tenant resolver error:', error);
+    logger.error('Tenant resolver error', { error: String(error) });
     next(error);
   }
 };
