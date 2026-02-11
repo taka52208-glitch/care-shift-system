@@ -1,4 +1,5 @@
 User-agent: *
 Allow: /
+Disallow: /app/
 
-Sitemap: https://careshift-app.vercel.app/sitemap.xml
+Sitemap: https://care-shift-system.vercel.app/sitemap.xml
