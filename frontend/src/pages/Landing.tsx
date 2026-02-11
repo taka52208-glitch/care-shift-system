@@ -19,6 +19,7 @@ function Landing() {
             <span className="nav-logo-text">CareShift</span>
           </Link>
           <div className="nav-links">
+            <Link to="/blog" className="nav-link">お役立ちコラム</Link>
             <Link to="/login" className="nav-link">ログイン</Link>
             <Link to="/register" className="btn btn-primary">14日間無料で試す</Link>
           </div>

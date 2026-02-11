@@ -17,6 +17,8 @@ import Register from './pages/Register'
 import Terms from './pages/Terms'
 import Privacy from './pages/Privacy'
 import Tokushoho from './pages/Tokushoho'
+import Blog from './pages/Blog'
+import BlogPost from './pages/BlogPost'
 import ForgotPassword from './pages/ForgotPassword'
 import ResetPassword from './pages/ResetPassword'
 
@@ -61,6 +63,10 @@ function App() {
       <Route path="/terms" element={<Terms />} />
       <Route path="/privacy" element={<Privacy />} />
       <Route path="/tokushoho" element={<Tokushoho />} />
+
+      {/* Blog */}
+      <Route path="/blog" element={<Blog />} />
+      <Route path="/blog/:slug" element={<BlogPost />} />
 
       {/* Password reset */}
       <Route path="/forgot-password" element={<ForgotPassword />} />
