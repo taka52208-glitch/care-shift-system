@@ -8,7 +8,6 @@ function Register() {
   const { register } = useAuth()
   const [formData, setFormData] = useState({
     tenantName: '',
-    subdomain: '',
     userName: '',
     email: '',
     password: '',
@@ -16,33 +15,16 @@ function Register() {
   })
   const [error, setError] = useState('')
   const [isLoading, setIsLoading] = useState(false)
-  const [subdomainStatus, setSubdomainStatus] = useState<'idle' | 'checking' | 'available' | 'taken'>('idle')
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target
     setFormData((prev) => ({ ...prev, [name]: value }))
-
-    // Check subdomain availability
-    if (name === 'subdomain' && value.length >= 3) {
-      checkSubdomain(value)
-    } else if (name === 'subdomain') {
-      setSubdomainStatus('idle')
-    }
   }
 
-  const checkSubdomain = async (subdomain: string) => {
-    setSubdomainStatus('checking')
-    try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/auth/check-subdomain`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ subdomain }),
-      })
-      const data = await response.json()
-      setSubdomainStatus(data.available ? 'available' : 'taken')
-    } catch {
-      setSubdomainStatus('idle')
-    }
+  const generateSubdomain = () => {
+    const chars = 'abcdefghijklmnopqrstuvwxyz0123456789'
+    const random = Array.from({ length: 8 }, () => chars[Math.floor(Math.random() * chars.length)]).join('')
+    return `cs-${random}`
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -60,17 +42,12 @@ function Register() {
       return
     }
 
-    if (subdomainStatus === 'taken') {
-      setError('このサブドメインは既に使用されています')
-      return
-    }
-
     setIsLoading(true)
 
     try {
       await register({
         tenantName: formData.tenantName,
-        subdomain: formData.subdomain,
+        subdomain: generateSubdomain(),
         userName: formData.userName,
         email: formData.email,
         password: formData.password,
@@ -111,32 +88,6 @@ function Register() {
                 placeholder="例: ケアホームさくら"
                 required
               />
-            </div>
-            <div className="form-group">
-              <label htmlFor="subdomain">サブドメイン *</label>
-              <div className="subdomain-input">
-                <input
-                  type="text"
-                  id="subdomain"
-                  name="subdomain"
-                  value={formData.subdomain}
-                  onChange={handleChange}
-                  placeholder="sakura"
-                  pattern="[a-z0-9][a-z0-9-]{1,30}[a-z0-9]"
-                  required
-                />
-                <span className="subdomain-suffix">.careshift.jp</span>
-              </div>
-              {subdomainStatus === 'checking' && (
-                <span className="subdomain-status checking">確認中...</span>
-              )}
-              {subdomainStatus === 'available' && (
-                <span className="subdomain-status available">利用可能</span>
-              )}
-              {subdomainStatus === 'taken' && (
-                <span className="subdomain-status taken">既に使用されています</span>
-              )}
-              <small>3-32文字の英小文字、数字、ハイフンのみ</small>
             </div>
           </div>
 
@@ -208,7 +159,7 @@ function Register() {
           <button
             type="submit"
             className="btn btn-primary btn-full btn-large"
-            disabled={isLoading || subdomainStatus === 'taken'}
+            disabled={isLoading}
           >
             {isLoading ? '登録中...' : '無料トライアルを開始'}
           </button>

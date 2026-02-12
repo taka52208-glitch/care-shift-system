@@ -19,6 +19,7 @@ function Landing() {
             <span className="nav-logo-text">CareShift</span>
           </Link>
           <div className="nav-links">
+            <a href="mailto:taka52208@gmail.com" className="nav-link nav-contact">お問い合わせ</a>
             <Link to="/blog" className="nav-link">お役立ちコラム</Link>
             <Link to="/login" className="nav-link">ログイン</Link>
             <Link to="/register" className="btn btn-primary">14日間無料で試す</Link>
@@ -51,16 +52,16 @@ function Landing() {
           {/* Hero Stats */}
           <div className="hero-stats">
             <div className="hero-stat">
-              <span className="hero-stat-number">80%</span>
-              <span className="hero-stat-label">シフト作成時間削減</span>
+              <span className="hero-stat-number">30分</span>
+              <span className="hero-stat-label">でシフト自動生成</span>
             </div>
             <div className="hero-stat">
-              <span className="hero-stat-number">0件</span>
-              <span className="hero-stat-label">配置基準違反</span>
+              <span className="hero-stat-number">全自動</span>
+              <span className="hero-stat-label">配置基準チェック</span>
             </div>
             <div className="hero-stat">
-              <span className="hero-stat-number">95%</span>
-              <span className="hero-stat-label">希望休反映率</span>
+              <span className="hero-stat-number">24時間</span>
+              <span className="hero-stat-label">クラウドアクセス</span>
             </div>
           </div>
         </div>
@@ -310,21 +311,21 @@ function Landing() {
             <div className="trust-card">
               <div className="trust-icon">💰</div>
               <div className="trust-content">
-                <h3>ICT補助金で実質負担を大幅軽減</h3>
+                <h3>ICT補助金で実質月額2,450円〜</h3>
                 <p>
-                  介護ICT導入支援事業の対象ツールです。
-                  補助率1/2〜3/4で、実質的な負担を大幅に軽減できる場合があります。
-                  申請方法もサポートいたします。
+                  介護テクノロジー導入支援事業（補助率1/2〜3/4）の対象ツールです。
+                  補助金適用で<strong>実質月額2,450円〜4,900円</strong>に。
+                  補助金の申請手続きも無料でサポートいたします。
                 </p>
               </div>
             </div>
             <div className="trust-card">
               <div className="trust-icon">♾️</div>
               <div className="trust-content">
-                <h3>スタッフ数無制限で業界最安水準</h3>
+                <h3>スタッフ数無制限の定額制</h3>
                 <p>
                   何名登録しても月額9,800円。スタッフ30名以上の施設なら、
-                  1人あたり月額327円以下。従量課金の他社と比べて圧倒的にお得です。
+                  1人あたり月額327円以下。従量課金の他社と比べてお得です。
                 </p>
               </div>
             </div>
@@ -436,7 +437,15 @@ function Landing() {
           <Link to="/register" className="btn btn-primary btn-large">
             14日間無料で試す
           </Link>
-          <p className="cta-sub">ご不明な点はお気軽にお問い合わせください</p>
+          <div className="cta-contact">
+            <p className="cta-contact-label">お電話・メールでのご相談も歓迎です</p>
+            <div className="cta-contact-info">
+              <a href="mailto:taka52208@gmail.com" className="cta-contact-link">
+                taka52208@gmail.com
+              </a>
+            </div>
+            <p className="cta-contact-note">「資料がほしい」「話を聞きたい」だけでもOKです</p>
+          </div>
         </div>
       </section>
 
@@ -446,6 +455,11 @@ function Landing() {
           <div className="footer-logo">
             <span className="nav-logo-icon">🏥</span>
             <span>CareShift</span>
+          </div>
+          <div className="footer-operator">
+            <p className="footer-operator-label">運営者情報</p>
+            <p>CareShift 開発・運営</p>
+            <p>お問い合わせ: <a href="mailto:taka52208@gmail.com">taka52208@gmail.com</a></p>
           </div>
           <div className="footer-links">
             <Link to="/terms">利用規約</Link>
