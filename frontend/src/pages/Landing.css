@@ -740,6 +740,43 @@
   font-size: 0.9375rem;
 }
 
+/* Developer Story Section */
+.developer-story {
+  padding: 4rem 2rem;
+  background: #f8fafc;
+}
+
+.developer-story-container {
+  max-width: 700px;
+  margin: 0 auto;
+}
+
+.developer-message {
+  background: white;
+  border-radius: 12px;
+  padding: 2rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  border-left: 4px solid var(--primary-color, #667eea);
+  font-size: 1rem;
+  line-height: 1.8;
+  color: var(--text-secondary, #555);
+}
+
+.developer-message p {
+  margin-bottom: 1rem;
+}
+
+.developer-message p:last-of-type {
+  margin-bottom: 0.5rem;
+}
+
+.developer-name {
+  text-align: right;
+  font-weight: 600;
+  color: var(--text-primary, #333);
+  margin-top: 1rem;
+}
+
 /* CTA Section */
 .cta {
   padding: 5rem 2rem;

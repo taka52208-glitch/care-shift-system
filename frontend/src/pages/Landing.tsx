@@ -22,7 +22,7 @@ function Landing() {
             <a href="mailto:taka52208@gmail.com" className="nav-link nav-contact">お問い合わせ</a>
             <Link to="/blog" className="nav-link">お役立ちコラム</Link>
             <Link to="/login" className="nav-link">ログイン</Link>
-            <Link to="/register" className="btn btn-primary">14日間無料で試す</Link>
+            <Link to="/register" className="btn btn-primary">無料でシフト表を作る</Link>
           </div>
         </div>
       </nav>
@@ -30,24 +30,24 @@ function Landing() {
       {/* Hero Section */}
       <section className="hero">
         <div className="hero-container">
-          <p className="hero-pain">毎月のシフト作成、まだExcelで消耗していませんか？</p>
+          <p className="hero-pain">来月のシフト表、今日中に完成します。</p>
           <h1 className="hero-title">
             介護シフト作成を<br />
             <span className="highlight">10時間 → 30分</span>に
           </h1>
           <p className="hero-description">
             人員配置基準・夜勤回数・希望休をすべて考慮した最適シフトを自動生成。<br />
-            スタッフ数無制限で<span className="hero-strong">月額9,800円</span>。
+            ICT補助金で<span className="hero-strong">実質月額2,450円〜</span>。スタッフ数無制限。
           </p>
           <div className="hero-actions">
             <Link to="/register" className="btn btn-primary btn-large">
-              14日間無料で試す
+              無料でシフト表を作ってみる
             </Link>
             <a href="#demo" className="btn btn-outline btn-large">
               画面を見る
             </a>
           </div>
-          <p className="hero-note">クレジットカード不要 / 初期費用0円 / いつでもキャンセル可能</p>
+          <p className="hero-note">14日間無料 / クレジットカード不要 / 初期費用0円 / いつでもキャンセル</p>
 
           {/* Hero Stats */}
           <div className="hero-stats">
@@ -370,7 +370,7 @@ function Landing() {
               <li>導入サポート無料</li>
             </ul>
             <Link to="/register" className="btn btn-primary btn-large btn-full">
-              14日間無料で試す
+              無料でシフト表を作ってみる
             </Link>
             <p className="pricing-note">クレジットカード不要 / いつでもキャンセル可能</p>
           </div>
@@ -426,6 +426,24 @@ function Landing() {
         </div>
       </section>
 
+      {/* Developer Story Section */}
+      <section className="developer-story">
+        <div className="developer-story-container">
+          <h2 className="section-title">開発者より</h2>
+          <div className="developer-message">
+            <p>
+              介護施設で働く方々が、毎月何時間もシフト作成に費やしている現実を知り、
+              「テクノロジーで解決できるはずだ」と思い開発を始めました。
+            </p>
+            <p>
+              現在、<strong>先着30施設様限定</strong>で導入サポート（初期設定の代行・操作説明）を
+              <strong>無料</strong>で提供しています。ぜひお気軽にお試しください。
+            </p>
+            <p className="developer-name">CareShift 開発者</p>
+          </div>
+        </div>
+      </section>
+
       {/* CTA Section */}
       <section className="cta">
         <div className="cta-container">
@@ -434,17 +452,19 @@ function Landing() {
             初期費用0円・クレジットカード不要。<br />
             導入サポートも無料でお手伝いします。
           </p>
-          <Link to="/register" className="btn btn-primary btn-large">
-            14日間無料で試す
-          </Link>
+          <div className="cta-buttons">
+            <Link to="/register" className="btn btn-primary btn-large">
+              無料でシフト表を作ってみる
+            </Link>
+          </div>
           <div className="cta-contact">
-            <p className="cta-contact-label">お電話・メールでのご相談も歓迎です</p>
+            <p className="cta-contact-label">メールでのご相談も歓迎です</p>
             <div className="cta-contact-info">
               <a href="mailto:taka52208@gmail.com" className="cta-contact-link">
                 taka52208@gmail.com
               </a>
             </div>
-            <p className="cta-contact-note">「資料がほしい」「話を聞きたい」だけでもOKです</p>
+            <p className="cta-contact-note">「資料がほしい」「まず話を聞きたい」だけでもOKです</p>
           </div>
         </div>
       </section>

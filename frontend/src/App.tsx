@@ -21,6 +21,7 @@ import Blog from './pages/Blog'
 import BlogPost from './pages/BlogPost'
 import ForgotPassword from './pages/ForgotPassword'
 import ResetPassword from './pages/ResetPassword'
+import Download from './pages/Download'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useAuth()
@@ -67,6 +68,9 @@ function App() {
       {/* Blog */}
       <Route path="/blog" element={<Blog />} />
       <Route path="/blog/:slug" element={<BlogPost />} />
+
+      {/* Download */}
+      <Route path="/download" element={<Download />} />
 
       {/* Password reset */}
       <Route path="/forgot-password" element={<ForgotPassword />} />

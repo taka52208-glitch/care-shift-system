@@ -14,6 +14,7 @@ import requestRoutes from './routes/request.js';
 import reportRoutes from './routes/report.js';
 import billingRoutes from './routes/billing.js';
 import webhookRoutes from './routes/webhook.js';
+import leadRoutes from './routes/lead.js';
 import { logger } from './lib/logger.js';
 
 export function createApp() {
@@ -56,6 +57,7 @@ export function createApp() {
   app.use('/api/requests', requestRoutes);
   app.use('/api/reports', reportRoutes);
   app.use('/api/billing', billingRoutes);
+  app.use('/api/leads', leadRoutes);
 
   // Health check
   app.get('/api/health', (_req, res) => {
